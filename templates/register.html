@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0" style="border-radius: 20px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+            <div class="card-body p-5">
+            <div class="text-center mb-4">
+                <div class="mb-4">
+                    <img src="{% static 'images/logo.png' %}" 
+                         alt="SAFAR_SMART Logo" 
+                         style="width: 100px; height: 100px; border-radius: 20px; object-fit: contain; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3); background: white; padding: 10px;">
+                </div>
+                <h2 class="fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Join SAFAR_SMART</h2>
+                <p style="color: #6b7280; font-size: 1.1rem;">Create your account and start planning amazing trips</p>
+            </div>
+            
+            <div id="message" class="alert" style="display: none;"></div>
+
+            <!-- Registration Form -->
+            <form id="registerForm">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="username" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-person me-2"></i>Username
+                    </label>
+                    <input type="text" id="username" name="username" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Choose a username" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="email" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-envelope me-2"></i>Email Address
+                    </label>
+                    <input type="email" id="email" name="email" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Enter your email" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="password" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-lock me-2"></i>Password
+                    </label>
+                    <input type="password" id="password" name="password" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Create a password" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="password2" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-lock-fill me-2"></i>Confirm Password
+                    </label>
+                    <input type="password" id="password2" name="password2" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Confirm your password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-modern w-100 btn-lg">
+                    <i class="bi bi-person-plus"></i> Create Account
+                </button>
+            </form>
+
+            <!-- OTP Verification Section -->
+            <div id="otpSection" class="mt-4" style="display: none;">
+                <div class="text-center mb-4">
+                    <div class="mb-4">
+                        <img src="{% static 'images/logo.png' %}" 
+                             alt="SAFAR_SMART Logo" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: contain; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3); background: white; padding: 8px;">
+                    </div>
+                    <h3 class="fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Verify Your Email</h3>
+                    <p style="color: #6b7280; font-size: 1.1rem;">We've sent a verification code to your email</p>
+                </div>
+                
+                <form id="otpForm">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="otp" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                            <i class="bi bi-key me-2"></i>Verification Code
+                        </label>
+                        <input type="text" id="otp" name="otp" class="form-control text-center" 
+                               style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease; letter-spacing: 0.5rem;" 
+                               placeholder="000000" maxlength="6" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 btn-lg mb-3">
+                        <i class="bi bi-check-circle"></i> Verify Email
+                    </button>
+                </form>
+                
+                <div class="text-center">
+                    <button id="resendOtpButton" class="btn btn-link" disabled>
+                        Resend Code (30s)
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <p style="color: #6b7280;">Already have an account? 
+                    <a href="{% url 'login' %}" style="color: #6366f1; font-weight: 600; text-decoration: none;">Sign in here</a>
+                </p>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const registerForm = document.getElementById('registerForm');
+    const otpSection = document.getElementById('otpSection');
+    const otpForm = document.getElementById('otpForm');
+    const messageDiv = document.getElementById('message');
+    const resendOtpButton = document.getElementById('resendOtpButton');
+
+    let countdown = 30;
+    let countdownInterval;
+
+    function showMessage(type, msg) {
+        messageDiv.style.display = 'block';
+        messageDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        messageDiv.innerHTML = `
+            ${msg}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+    }
+
+    function startCountdown() {
+        resendOtpButton.disabled = true;
+        resendOtpButton.innerHTML = `<i class="bi bi-clock"></i> Resend Code (${countdown}s)`;
+        countdownInterval = setInterval(() => {
+            countdown--;
+            resendOtpButton.innerHTML = `<i class="bi bi-clock"></i> Resend Code (${countdown}s)`;
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                resendOtpButton.disabled = false;
+                resendOtpButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Resend Code';
+                countdown = 30;
+            }
+        }, 1000);
+    }
+
+    registerForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const password2 = document.getElementById('password2').value;
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating Account...';
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/users/register/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ username, email, password, password2 })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('success', data.message);
+                registerForm.style.display = 'none';
+                otpSection.style.display = 'block';
+                startCountdown();
+            } else {
+                showMessage('danger', data.email ? data.email[0] : data.username ? data.username[0] : data.password ? data.password[0] : data.password2 ? data.password2[0] : data.message || 'Registration failed.');
+            }
+        } catch (error) {
+            showMessage('danger', 'An error occurred. Please try again.');
+            console.error('Error:', error);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    otpForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const email = document.getElementById('email').value;
+        const otp = document.getElementById('otp').value;
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying...';
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/users/verify-otp/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ email, otp })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('success', data.message + ' Redirecting to login...');
+                clearInterval(countdownInterval);
+                setTimeout(() => {
+                    window.location.href = '{% url 'login' %}';
+                }, 2000);
+            } else {
+                showMessage('danger', data.error || 'OTP verification failed.');
+            }
+        } catch (error) {
+            showMessage('danger', 'An error occurred during OTP verification. Please try again.');
+            console.error('Error:', error);
+        } finally {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+
+    resendOtpButton.addEventListener('click', async function() {
+        const email = document.getElementById('email').value;
+
+        try {
+            const response = await fetch('/api/users/resend-otp/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ email, otp_type: 'registration' })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('success', data.message);
+                countdown = 30;
+                startCountdown();
+            } else {
+                showMessage('danger', data.error || 'Failed to resend OTP.');
+            }
+        } catch (error) {
+            showMessage('danger', 'An error occurred while resending OTP. Please try again.');
+            console.error('Error:', error);
+        }
+    });
+</script>
+{% endblock %}

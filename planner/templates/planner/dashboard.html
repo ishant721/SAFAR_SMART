@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid px-0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    /* Simple hover effect for feature-card-new - matching home page exactly */
+    .feature-card-new:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="homepage-wrapper">
+
+    <!-- Dashboard Hero Section -->
+    <header class="hero-main">
+        <div class="hero-content text-center">
+            <div class="mb-4">
+                <img src="{% static 'images/logo.png' %}" 
+                     alt="SAFAR_SMART Logo" 
+                     style="width: 120px; height: 120px; border-radius: 20px; object-fit: contain; box-shadow: 0 15px 35px rgba(99, 102, 241, 0.3); margin-bottom: 2rem; background: white; padding: 15px;">
+            </div>
+            <h1 class="display-2 fw-bolder mb-4">Welcome Back, <span style="color: #8b5cf6;">{{ user.username }}</span></h1>
+            <p class="lead mb-5">Your next adventure awaits. Let's create unforgettable memories together.</p>
+            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg">
+                <i class="bi bi-plus-circle me-2"></i>Plan a New Trip
+            </a>
+        </div>
+    </header>
+
+    <!-- Quick Stats Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold">Your Travel Stats</h2>
+                <p class="lead text-muted">Track your journey with SAFAR_SMART.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-3">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Total Trips" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">{{ user.trip_set.count }}</h5>
+                        <p class="text-muted">Trips Planned</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Destinations" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">{{ user.trip_set.count }}</h5>
+                        <p class="text-muted">Destinations Explored</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Days Planned" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">
+                            {% if user.trip_set.all %}
+                                {% for trip in user.trip_set.all %}
+                                    {% if forloop.first %}{{ trip.duration }}{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </h5>
+                        <p class="text-muted">Days Planned</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Experience Rating" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">4.9</h5>
+                        <p class="text-muted">Avg. Experience</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Your Trips Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Your Adventures</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Review, edit, or continue planning your journeys.</p>
+            </div>
+
+            {% if user.trip_set.all %}
+                <div class="row g-4">
+                    {% for trip in user.trip_set.all %}
+                    <div class="col-lg-4 col-md-6">
+                        <div class="feature-card-new h-100 p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h5 class="fw-bold mb-0" style="color: #1f2937;">{{ trip.destination }}</h5>
+                                <span class="badge" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;">{{ trip.month }}</span>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-4 text-center">
+                                    <div style="background: rgba(99, 102, 241, 0.1); border-radius: 8px; padding: 0.5rem;">
+                                        <i class="bi bi-clock" style="color: #6366f1;"></i>
+                                        <div class="small fw-bold" style="color: #1f2937;">{{ trip.duration }} days</div>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div style="background: rgba(16, 185, 129, 0.1); border-radius: 8px; padding: 0.5rem;">
+                                        <i class="bi bi-people" style="color: #10b981;"></i>
+                                        <div class="small fw-bold" style="color: #1f2937;">{{ trip.num_people }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-center">
+                                    <div style="background: rgba(245, 158, 11, 0.1); border-radius: 8px; padding: 0.5rem;">
+                                        <i class="bi bi-cash-coin" style="color: #f59e0b;"></i>
+                                        <div class="small fw-bold" style="color: #1f2937;">{{ trip.budget_type }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-3">{{ trip.holiday_type }}</p>
+                            {% if trip.comments %}
+                            <p class="text-muted small mb-4">{{ trip.comments|truncatewords:15 }}</p>
+                            {% endif %}
+                            <a href="{% url 'trip_detail' trip.id %}" class="btn btn-primary-modern w-100">
+                                <i class="bi bi-eye me-2"></i>View Full Itinerary
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="row justify-content-center">
+                    <div class="col-lg-6">
+                        <div class="feature-card-new text-center p-5">
+                            <div class="mb-4">
+                                <img src="{% static 'images/logo.png' %}" 
+                                     alt="SAFAR_SMART Logo" 
+                                     style="width: 100px; height: 100px; border-radius: 20px; object-fit: contain; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3); background: white; padding: 10px;">
+                            </div>
+                            <h4 class="fw-bold mb-3" style="color: #1f2937;">Your Travel Journal is Empty</h4>
+                            <p class="text-muted mb-4">Let's change that! Start planning your next great escape with our AI-powered travel planner.</p>
+                            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg">
+                                <i class="bi bi-plus-circle me-2"></i>Create Your First Trip
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Quick Actions Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Quick Actions</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Everything you need at your fingertips.</p>
+            </div>
+            <div class="row g-5">
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-plus-circle" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Plan New Trip</h5>
+                    <p style="color: #6b7280;">Start creating your next adventure with our AI travel planner.</p>
+                    <a href="{% url 'create_trip' %}" class="btn btn-outline-modern">Get Started</a>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-chat-dots" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">AI Travel Assistant</h5>
+                    <p style="color: #6b7280;">Get instant help and suggestions from our smart travel assistant.</p>
+                    <a href="#" class="btn btn-outline-modern">Chat Now</a>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-globe" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Explore Destinations</h5>
+                    <p style="color: #6b7280;">Discover amazing places and get inspired for your next journey.</p>
+                    <a href="#destinations" class="btn btn-outline-modern">Explore</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Popular Destinations -->
+    <section class="py-5 bg-light" id="destinations">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Popular Destinations</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Get inspired for your next journey.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.pexels.com/photos/161853/eiffel-tower-paris-france-tower-161853.jpeg?auto=compress&cs=tinysrgb&w=400" 
+                             alt="Paris" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Paris, France</h6>
+                            <p class="text-muted mb-2">City of Light and Romance - Explore iconic landmarks, world-class museums, and charming cafés.</p>
+                            <span class="badge" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-size: 0.7rem;">Popular</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.pexels.com/photos/248195/pexels-photo-248195.jpeg?auto=compress&cs=tinysrgb&w=400" 
+                             alt="Tokyo" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Tokyo, Japan</h6>
+                            <p class="text-muted mb-2">Modern Metropolis - Experience cutting-edge technology, traditional culture, and amazing cuisine.</p>
+                            <span class="badge" style="background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 0.7rem;">Trending</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.pexels.com/photos/1388030/pexels-photo-1388030.jpeg?auto=compress&cs=tinysrgb&w=400" 
+                             alt="Bali" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(245, 158, 11, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Bali, Indonesia</h6>
+                            <p class="text-muted mb-2">Tropical Paradise - Discover pristine beaches, ancient temples, and vibrant local culture.</p>
+                            <span class="badge" style="background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; font-size: 0.7rem;">Hot</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.pexels.com/photos/460672/pexels-photo-460672.jpeg?auto=compress&cs=tinysrgb&w=400" 
+                             alt="New York" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">New York, USA</h6>
+                            <p class="text-muted mb-2">The Big Apple - Experience the energy of Broadway, Central Park, and world-famous skyline.</p>
+                            <span class="badge" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; font-size: 0.7rem;">Classic</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4 text-center">
+            <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Ready for Your Next Adventure?</h2>
+            <p class="lead mb-4" style="color: #6b7280; font-size: 1.2rem;">Let SAFAR_SMART create the perfect itinerary for your next journey.</p>
+            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">
+                <i class="bi bi-plus-circle me-2"></i>Plan Your Next Trip
+            </a>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+/* Custom CSS for SAFAR_SMART */
+
+body {
+    background-color: #f0f2f5;
+    font-family: 'Roboto', sans-serif;
+}
+
+.navbar {
+    background-color: #007bff !important; /* Primary blue */
+}
+
+.navbar-brand {
+    color: #ffffff !important;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.nav-link.active {
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+.btn-warning {
+    background-color: #ffc107; /* Warning yellow */
+    border-color: #ffc107;
+    color: #212529; /* Dark text for contrast */
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #e0a800;
+}
+
+.card {
+    border-radius: 0.75rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+}
+
+.footer {
+    background-color: #e9ecef;
+    color: #6c757d;
+}

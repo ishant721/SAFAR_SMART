@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Contact Us - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid px-0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    /* Simple hover effect for feature-card-new - matching home page exactly */
+    .feature-card-new:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="homepage-wrapper">
+
+    <!-- Hero Section -->
+    <header class="hero-main">
+        <div class="hero-content text-center">
+            <div class="mb-4">
+                <img src="https://images.unsplash.com/photo-1423666639041-f56000c27a9a?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80" 
+                     alt="Contact Us" 
+                     style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; box-shadow: 0 15px 35px rgba(99, 102, 241, 0.3); margin-bottom: 2rem;">
+            </div>
+            <h1 class="display-2 fw-bolder mb-4">Get in <span style="color: #8b5cf6;">Touch</span></h1>
+            <p class="lead mb-5">We'd love to hear from you. Reach out with questions, feedback, or just to say hello.</p>
+            <a href="#contactForm" class="btn btn-primary-modern btn-lg">Start Conversation</a>
+        </div>
+    </header>
+
+    <!-- Contact Options Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold">How Can We Help?</h2>
+                <p class="lead text-muted">Choose the best way to reach out to us.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1423666639041-f56000c27a9a?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="General Support" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">General Support</h5>
+                        <p class="text-muted">Questions about SAFAR_SMART features, account help, or travel planning assistance.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Technical Issues" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Technical Issues</h5>
+                        <p class="text-muted">Experiencing bugs, login problems, or need help with the AI travel planner.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Partnership" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Partnership</h5>
+                        <p class="text-muted">Interested in collaborating with us or integrating SAFAR_SMART into your business.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Form Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Send Us a Message</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Fill out the form below and we'll get back to you within 24 hours.</p>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="feature-card-new p-5">
+                        <form id="contactForm">
+                            {% csrf_token %}
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        <input type="text" class="form-control-modern" id="firstName" name="first_name" placeholder="First Name" required>
+                                        <label for="firstName">
+                                            <i class="bi bi-person"></i> First Name
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        <input type="text" class="form-control-modern" id="lastName" name="last_name" placeholder="Last Name" required>
+                                        <label for="lastName">
+                                            <i class="bi bi-person"></i> Last Name
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-floating-modern">
+                                <input type="email" class="form-control-modern" id="email" name="email" placeholder="Email Address" required>
+                                <label for="email">
+                                    <i class="bi bi-envelope"></i> Email Address
+                                </label>
+                            </div>
+                            
+                            <div class="form-floating-modern">
+                                <select class="form-control-modern" id="subject" name="subject" required>
+                                    <option value="" disabled selected>Choose a subject</option>
+                                    <option value="general">General Inquiry</option>
+                                    <option value="support">Technical Support</option>
+                                    <option value="feedback">Feedback & Suggestions</option>
+                                    <option value="partnership">Partnership Opportunities</option>
+                                    <option value="press">Press & Media</option>
+                                </select>
+                                <label for="subject">
+                                    <i class="bi bi-tag"></i> Subject
+                                </label>
+                            </div>
+                            
+                            <div class="form-floating-modern">
+                                <textarea class="form-control-modern" id="message" name="message" placeholder="Your Message" style="height: 150px" required></textarea>
+                                <label for="message">
+                                    <i class="bi bi-chat-text"></i> Your Message
+                                </label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary-modern btn-lg w-100">
+                                <i class="bi bi-send-fill me-2"></i> Send Message
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Information Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Other Ways to Reach Us</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Prefer a different communication method?</p>
+            </div>
+            <div class="row g-5">
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-geo-alt" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Visit Our Office</h5>
+                    <p style="color: #6b7280;">123 Travel Lane<br>Wanderlust City, Global 12345<br><strong>Mon-Fri:</strong> 9AM-6PM EST</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-telephone" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Call Us</h5>
+                    <p style="color: #6b7280;">+1 (555) 123-4567<br>Support Hotline Available<br><strong>Response:</strong> Immediate</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-envelope" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Email Direct</h5>
+                    <p style="color: #6b7280;">support@safarsmart.com<br>General inquiries and support<br><strong>Response:</strong> Within 24 hours</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Quick Help Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Quick Help</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Find answers to common questions.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="How it works" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">How does SAFAR_SMART work?</h6>
+                            <p class="text-muted mb-0">Our AI analyzes your preferences, budget, and travel dates to create personalized itineraries with activities, dining, and accommodation suggestions.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="Pricing" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(245, 158, 11, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Is SAFAR_SMART free to use?</h6>
+                            <p class="text-muted mb-0">Yes! You can create your account and generate personalized travel itineraries at no cost. Premium features are available for enhanced planning.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="Destinations" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Which destinations are supported?</h6>
+                            <p class="text-muted mb-0">SAFAR_SMART supports travel planning for destinations worldwide, with detailed local insights and recommendations for major cities and popular travel spots.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="Account Help" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Need help with your account?</h6>
+                            <p class="text-muted mb-0">If you're having trouble logging in, resetting your password, or accessing your saved trips, our support team is here to help you quickly.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4 text-center">
+            <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Still Have Questions?</h2>
+            <p class="lead mb-4" style="color: #6b7280; font-size: 1.2rem;">Don't hesitate to reach out. We're here to help make your travel dreams come true.</p>
+            {% if not user.is_authenticated %}
+                <a href="{% url 'registration' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">Try SAFAR_SMART Free</a>
+            {% else %}
+                <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">Plan Your Next Trip</a>
+            {% endif %}
+        </div>
+    </section>
+
+</div>
+
+<script>
+document.getElementById('contactForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...';
+    submitBtn.disabled = true;
+    
+    // Simulate form submission
+    setTimeout(() => {
+        alert('Thank you for your message! We\'ll get back to you soon.');
+        this.reset();
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }, 2000);
+});
+</script>
+{% endblock %}

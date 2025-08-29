@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm border-0" style="border-radius: 20px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+            <div class="card-body p-5">
+            <div class="text-center mb-4">
+                <div class="mb-4">
+                    <img src="{% static 'images/logo.png' %}" 
+                         alt="SAFAR_SMART Logo" 
+                         style="width: 100px; height: 100px; border-radius: 20px; object-fit: contain; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3); background: white; padding: 10px;">
+                </div>
+                <h2 class="fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Welcome Back</h2>
+                <p style="color: #6b7280; font-size: 1.1rem;">Sign in to continue your travel planning journey</p>
+            </div>
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            {% if form.errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {% for field in form %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <p class="mb-0">{{ error }}</p>
+                        {% endfor %}
+                    {% endif %}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endif %}
+            
+            <form method="post" action="{% url 'login' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="id_email" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-envelope me-2"></i>Email Address
+                    </label>
+                    <input type="email" id="id_email" name="email" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Enter your email" required>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="id_password" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                        <i class="bi bi-lock me-2"></i>Password
+                    </label>
+                    <input type="password" id="id_password" name="password" class="form-control" 
+                           style="padding: 0.85rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.1rem; transition: all 0.2s ease;" 
+                           placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-modern w-100 btn-lg mb-3">
+                    <i class="bi bi-box-arrow-in-right"></i> Sign In
+                </button>
+            </form>
+            
+            <div class="text-center">
+                <p style="color: #6b7280; margin-bottom: 0.5rem;">Don't have an account? 
+                    <a href="{% url 'registration' %}" style="color: #6366f1; font-weight: 600; text-decoration: none;">Register here</a>
+                </p>
+                <p style="color: #6b7280; margin-bottom: 0;">
+                    <a href="{% url 'forgot-password' %}" style="color: #6366f1; text-decoration: none;">Forgot password?</a>
+                </p>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

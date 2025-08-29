@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}About Us - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid px-0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    /* Simple hover effect for feature-card-new - matching home page exactly */
+    .feature-card-new:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="homepage-wrapper">
+
+    <!-- Hero Section -->
+    <header class="hero-main">
+        <div class="hero-content text-center">
+            <div class="mb-4">
+                <img src="{% static 'images/logo.png' %}" 
+                     alt="SAFAR_SMART Logo" 
+                     style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; box-shadow: 0 15px 35px rgba(99, 102, 241, 0.3); margin-bottom: 2rem;">
+            </div>
+            <h1 class="display-2 fw-bolder mb-4">About <span style="color: #8b5cf6;">SAFAR_SMART</span></h1>
+            <p class="lead mb-5">Revolutionizing travel planning with AI-powered personalized experiences.</p>
+            <a href="{% url 'registration' %}" class="btn btn-primary-modern btn-lg">Join Our Journey</a>
+        </div>
+    </header>
+
+    <!-- Our Mission Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold">Our Mission</h2>
+                <p class="lead text-muted">Making travel planning effortless for everyone.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="AI Innovation" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">AI Innovation</h5>
+                        <p class="text-muted">Leveraging cutting-edge artificial intelligence to create smarter travel experiences.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Global Community" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Global Community</h5>
+                        <p class="text-muted">Connecting travelers worldwide with local insights and authentic experiences.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Accessible Travel" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Accessible Travel</h5>
+                        <p class="text-muted">Making personalized travel planning available to everyone, regardless of experience.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Our Values Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Our Core Values</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">The principles that guide everything we do.</p>
+            </div>
+            <div class="row g-5">
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-lightbulb" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Innovation</h5>
+                    <p style="color: #6b7280;">Constantly pushing boundaries to bring you the latest in travel technology and AI-powered solutions.</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-person-heart" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Personalization</h5>
+                    <p style="color: #6b7280;">Every traveler is unique, and we craft experiences that reflect your individual preferences and dreams.</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <i class="bi bi-shield-check" style="color: white; font-size: 2rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Trust</h5>
+                    <p style="color: #6b7280;">Building reliable, secure, and trustworthy travel planning solutions you can depend on.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Our Story Section -->
+    <section class="py-5" style="position: relative;">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Our Story</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">From vision to reality.</p>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="feature-card-new text-center p-5">
+                        <div class="mb-4">
+                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80" 
+                                 alt="Founder" 
+                                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin: 0 auto; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);">
+                        </div>
+                        <p class="lead fst-italic" style="color: #374151; font-size: 1.1rem; line-height: 1.6;">"Travel planning was always overwhelming for me. I wanted to create something that would make it simple, intelligent, and personal. SAFAR_SMART is that vision brought to life."</p>
+                        <h6 class="fw-bold mt-4" style="color: #1f2937;">- Ishant Singh, Founder</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Choose Us Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Why Choose SAFAR_SMART?</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">What makes us different.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="AI Technology" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Advanced AI Technology</h6>
+                            <p class="text-muted mb-0">Our proprietary AI analyzes millions of data points to create perfect itineraries.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="Real-time Updates" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Real-time Information</h6>
+                            <p class="text-muted mb-0">Live updates on weather, events, and local conditions keep your plans current.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="Budget Friendly" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(245, 158, 11, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">Budget-Conscious Planning</h6>
+                            <p class="text-muted mb-0">Smart recommendations that respect your budget without compromising on quality.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="feature-card-new p-4 d-flex align-items-start">
+                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&q=80" 
+                             alt="24/7 Support" 
+                             style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover; margin-right: 1rem; box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2); flex-shrink: 0;">
+                        <div>
+                            <h6 class="fw-bold mb-2" style="color: #1f2937;">24/7 Support</h6>
+                            <p class="text-muted mb-0">Our AI assistant is always available to help refine and adjust your travel plans.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4 text-center">
+            <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Ready to Start Your Adventure?</h2>
+            <p class="lead mb-4" style="color: #6b7280; font-size: 1.2rem;">Join thousands of travelers who trust SAFAR_SMART.</p>
+            {% if not user.is_authenticated %}
+                <a href="{% url 'registration' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">Create Your Free Itinerary Now</a>
+            {% else %}
+                <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">Plan Your Next Trip</a>
+            {% endif %}
+        </div>
+    </section>
+
+</div>
+{% endblock %}

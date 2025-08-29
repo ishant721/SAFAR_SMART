@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load form_extras %}
+
+{% block title %}Create New Trip - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid px-0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+    /* Remove all animations and transitions from elements within homepage-wrapper for this page */
+    .homepage-wrapper * {
+        animation: none !important;
+        transition: none !important;
+    }
+    /* Ensure feature-card-new has no hover effects on this page */
+    .feature-card-new:hover {
+        transform: none !important;
+        box-shadow: var(--shadow-lg) !important; /* Keep original shadow */
+    }
+    /* Remove shine effect from buttons on this page */
+    .btn-shine::before {
+        display: none !important;
+    }
+    .btn-primary-modern:hover {
+        transform: none !important;
+        box-shadow: var(--shadow) !important; /* Keep original shadow */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="homepage-wrapper">
+
+    <!-- Hero Section -->
+    <header class="hero-main" style="height: 50vh; min-height: 350px;">
+        <div class="hero-content text-center">
+            <h1 class="display-3 fw-bolder mb-3">Plan Your Next <span class="text-gradient">Adventure</span></h1>
+            <p class="lead mb-4">Tell us about your dream trip and we'll create a personalized itinerary for you!</p>
+        </div>
+    </header>
+
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="row justify-content-center">
+                <!-- Trip Planning Form -->
+                <div class="col-lg-8">
+                    <div class="feature-card-new p-5 h-100">
+                        <h2 class="h3 fw-bold mb-4" style="color: #1f2937;"><i class="bi bi-pencil-square me-2"></i>Trip Details</h2>
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <div class="row g-4">
+                                <!-- Destination & Month -->
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.destination|add_class:"form-control-modern" }}
+                                        <label for="{{ form.destination.id_for_label }}">
+                                            <i class="bi bi-geo-alt"></i> Destination
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.month|add_class:"form-control-modern" }}
+                                        <label for="{{ form.month.id_for_label }}">
+                                            <i class="bi bi-calendar-month"></i> Month of Travel
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Duration & People -->
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.duration|add_class:"form-control-modern" }}
+                                        <label for="{{ form.duration.id_for_label }}">
+                                            <i class="bi bi-clock"></i> Duration (Days)
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.num_people|add_class:"form-control-modern" }}
+                                        <label for="{{ form.num_people.id_for_label }}">
+                                            <i class="bi bi-people"></i> Number of People
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Holiday Type & Budget -->
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.holiday_type|add_class:"form-control-modern" }}
+                                        <label for="{{ form.holiday_type.id_for_label }}">
+                                            <i class="bi bi-star"></i> Holiday Type
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating-modern">
+                                        {{ form.budget_type|add_class:"form-control-modern" }}
+                                        <label for="{{ form.budget_type.id_for_label }}">
+                                            <i class="bi bi-wallet2"></i> Budget Type
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Comments -->
+                                <div class="col-12">
+                                    <div class="form-floating-modern">
+                                        {{ form.comments|add_class:"form-control-modern" }}
+                                        <label for="{{ form.comments.id_for_label }}">
+                                            <i class="bi bi-chat-text"></i> Additional Comments
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Share any specific preferences, requirements, or special requests for your trip.</small>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-4">
+                                <a href="{% url 'dashboard' %}" class="btn btn-outline-modern">
+                                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                                </a>
+                                <button type="submit" class="btn btn-primary-modern btn-lg">
+                                    <i class="bi bi-magic"></i> Create Trip & Generate Itinerary
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
+{% endblock %}

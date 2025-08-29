@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'home' %}">
+            <img src="{% static 'images/logo.png' %}" alt="SafarSmart Logo" style="height: 40px;">
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'contact' %}active{% endif %}" href="{% url 'contact' %}">Contact</a>
+                </li>
+                {% if user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                        {{ user.username }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li class="nav-item ms-lg-3">
+                    <a class="btn btn-outline-light" href="{% url 'login' %}">Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="btn btn-light" href="{% url 'registration' %}">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+
+{% block title %}Welcome to SAFAR_SMART - Your AI Travel Planner{% endblock %}
+
+{% block container_class %}container-fluid px-0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .main-content {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="homepage-wrapper">
+
+    <!-- Hero Section -->
+    <header class="hero-main">
+        <div class="hero-content text-center">
+            <div class="mb-4">
+                <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80" 
+                     alt="Travel Icon" 
+                     style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; box-shadow: 0 15px 35px rgba(99, 102, 241, 0.3); margin-bottom: 2rem;">
+            </div>
+            <h1 class="display-2 fw-bolder mb-4">Plan Your Next Adventure with <span style="color: #8b5cf6;">AI</span></h1>
+            <p class="lead mb-5">Safar Smart is your intelligent travel companion, crafting personalized journeys just for you.</p>
+            <a href="{% url 'registration' %}" class="btn btn-primary-modern btn-lg">Get Started for Free</a>
+        </div>
+    </header>
+
+    <!-- Features Section -->
+    <section class="py-5">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold">Why Choose Safar Smart?</h2>
+                <p class="lead text-muted">The future of travel planning is here.</p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="AI Planning" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Personalized Itineraries</h5>
+                        <p class="text-muted">Our AI learns your preferences to create a unique itinerary tailored to your tastes.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Smart Suggestions" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Smart Suggestions</h5>
+                        <p class="text-muted">Discover hidden gems, local hotspots, and unique experiences you won't find in a guidebook.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card-new text-center p-4">
+                        <img src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80" 
+                             alt="Budget Planning" 
+                             style="width: 80px; height: 80px; border-radius: 15px; object-fit: cover; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                        <h5 class="fw-bold" style="color: #1f2937;">Budget Control</h5>
+                        <p class="text-muted">From luxury getaways to budget-friendly adventures, we help you plan a trip that fits your finances.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">How It Works</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Planning your dream trip is as easy as 1-2-3.</p>
+            </div>
+            <div class="row g-5">
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <span style="color: white; font-size: 2rem; font-weight: 800;">1</span>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Tell Us Your Vision</h5>
+                    <p style="color: #6b7280;">Share your destination, travel dates, interests, and budget. The more we know, the better your itinerary will be.</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <span style="color: white; font-size: 2rem; font-weight: 800;">2</span>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">AI Crafts Your Plan</h5>
+                    <p style="color: #6b7280;">Our powerful AI gets to work, creating a detailed, day-by-day itinerary complete with activities, dining, and more.</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
+                        <span style="color: white; font-size: 2rem; font-weight: 800;">3</span>
+                    </div>
+                    <h5 class="fw-bold mt-3" style="color: #1f2937;">Explore with Ease</h5>
+                    <p style="color: #6b7280;">Access your complete itinerary anytime, anywhere. Your personalized travel guide is always in your pocket.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="py-5" style="position: relative;">
+        <div class="container-fluid px-4">
+            <div class="text-center mb-5">
+                <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">What Our Travelers Say</h2>
+                <p class="lead" style="color: #6b7280; font-size: 1.2rem;">Real stories from our community of explorers.</p>
+            </div>
+            <div id="testimonialCarousel" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    <div class="carousel-item active">
+                        <div class="testimonial-card-new text-center p-5">
+                            <div class="mb-4">
+                                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80" 
+                                     alt="Traveler" 
+                                     style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin: 0 auto; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);">
+                            </div>
+                            <p class="lead fst-italic" style="color: #374151; font-size: 1.1rem; line-height: 1.6;">"As a solo female traveler, safety is my top priority. Safar Smart gave me a detailed plan and peace of mind. I felt like I had a local guide with me the whole time."</p>
+                            <h6 class="fw-bold mt-4" style="color: #1f2937;">- Jessica M.</h6>
+                        </div>
+                    </div>
+                    <div class="carousel-item">
+                        <div class="testimonial-card-new text-center p-5">
+                            <div class="mb-4">
+                                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80" 
+                                     alt="Traveler" 
+                                     style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin: 0 auto; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);">
+                            </div>
+                            <p class="lead fst-italic" style="color: #374151; font-size: 1.1rem; line-height: 1.6;">"Safar Smart planned our entire trip to Bali, and it was magical. The AI thought of everything, from hidden waterfalls to the best local warungs. We couldn't have done it without them!"</p>
+                            <h6 class="fw-bold mt-4" style="color: #1f2937;">- The Johnson Family</h6>
+                        </div>
+                    </div>
+                    <div class="carousel-item">
+                        <div class="testimonial-card-new text-center p-5">
+                            <div class="mb-4">
+                                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80" 
+                                     alt="Traveler" 
+                                     style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin: 0 auto; box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);">
+                            </div>
+                            <p class="lead fst-italic" style="color: #374151; font-size: 1.1rem; line-height: 1.6;">"I used to spend weeks planning our vacations. Now, I just tell Safar Smart what I want, and it creates a perfect itinerary in minutes. It's a game-changer!"</p>
+                            <h6 class="fw-bold mt-4" style="color: #1f2937;">- David Chen</h6>
+                        </div>
+                    </div>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Next</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-5 bg-light">
+        <div class="container-fluid px-4 text-center">
+            <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Ready to Start Your Adventure?</h2>
+            <p class="lead mb-4" style="color: #6b7280; font-size: 1.2rem;">Your dream trip is just a few clicks away.</p>
+            <a href="{% url 'registration' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">Create Your Free Itinerary Now</a>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
