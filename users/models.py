@@ -14,6 +14,8 @@ class User(AbstractUser):
     otp_created_at = models.DateTimeField(blank=True, null=True)
     reset_otp = models.CharField(max_length=6, blank=True, null=True)
     reset_otp_created_at = models.DateTimeField(blank=True, null=True)
+    free_itineraries_count = models.IntegerField(default=0)
+    prepaid_itineraries_count = models.IntegerField(default=0)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
@@ -42,3 +44,10 @@ class User(AbstractUser):
             self.reset_otp = generate_otp()
             self.reset_otp_created_at = timezone.now()
         self.save()
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    paid_plan_credits = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return self.user.username

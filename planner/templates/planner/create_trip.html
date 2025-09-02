@@ -43,6 +43,18 @@
         </div>
     </header>
 
+    <section class="py-3 text-center">
+        <div class="container">
+            {% if user.is_authenticated %}
+                {% if remaining_free_itineraries > 0 %}
+                    <p class="alert alert-info">You have {{ remaining_free_itineraries }} free itinerary creations remaining.</p>
+                {% else %}
+                    <p class="alert alert-success">You have used your 2 free itinerary creations. You can now pay for each new itinerary from your wallet.</p>
+                {% endif %}
+            {% endif %}
+        </div>
+    </section>
+
     <section class="py-5">
         <div class="container-fluid px-4">
             <div class="row justify-content-center">
@@ -137,3 +149,4 @@
 
 </div>
 {% endblock %}
+

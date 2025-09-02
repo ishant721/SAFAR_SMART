@@ -1,6 +1,6 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
-from .models import User, generate_otp
+from .models import User, UserProfile, generate_otp
 from .serializers import UserSerializer, OTPSerializer, ForgotPasswordRequestSerializer, ResendOTPSerializer
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from .forms import LoginForm
 from django.utils import timezone
 from datetime import timedelta
+from payments.models import Payment # Commented out
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -210,3 +211,19 @@ def forgot_password_otp_verify_view(request):
 
 def forgot_password_request_view(request):
     return render(request, 'forgot_password.html')
+
+@login_required
+def profile_view(request):
+    user = request.user
+    user_profile, created = UserProfile.objects.get_or_create(user=user)
+    payments = Payment.objects.filter(user=user).order_by('-timestamp')
+    remaining_free_itineraries = 2 - user.free_itineraries_count # Calculate here
+    
+    context = {
+        'user': user,
+        'user_profile': user_profile,
+        'free_itineraries_count': user.free_itineraries_count,
+        'payments': payments,
+        'remaining_free_itineraries': remaining_free_itineraries, # Pass to context
+    }
+    return render(request, 'users/profile.html', context)

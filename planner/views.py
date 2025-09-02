@@ -6,6 +6,10 @@ from .forms import TripForm
 from .langgraph_logic import graph, generate_itinerary, recommend_activities_agent, fetch_useful_links_agent, weather_forecaster_agent, packing_list_generator_agent, food_culture_recommender_agent, chat_agent, accommodation_recommender_agent, expense_breakdown_agent, complete_trip_plan_agent
 from django.http import JsonResponse
 import json
+from django.urls import reverse # Added import
+from django.views.decorators.http import require_POST # Added import
+from users.models import UserProfile
+from django.contrib import messages
 
 @login_required
 def dashboard(request):
@@ -13,13 +17,35 @@ def dashboard(request):
 
 @login_required
 def create_trip(request):
+    form = TripForm() # Initialize form outside if/else for GET request
+    payment_required = False
+    trip_data = {}
+    user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+
     if request.method == 'POST':
         form = TripForm(request.POST)
         if form.is_valid():
+            # Check for prepaid itineraries first
+            if request.user.prepaid_itineraries_count > 0:
+                request.user.prepaid_itineraries_count -= 1
+                request.user.save()
+                # Proceed with trip creation
+            elif request.user.free_itineraries_count < 2:
+                request.user.free_itineraries_count += 1
+                request.user.save()
+                # Proceed with trip creation
+            elif user_profile.paid_plan_credits >= 5:
+                user_profile.paid_plan_credits -= 5
+                user_profile.save()
+            else:
+                # User has used up free itineraries and has no prepaid ones, payment required
+                messages.warning(request, 'You have used all your free itineraries. Please add money to your wallet to create more.')
+                return redirect('add_money')
+
+            # If we reach here, it means either free or prepaid itinerary was consumed
             trip = form.save(commit=False)
             trip.user = request.user
             trip.save()
-            # Automatically generate itinerary
             config = {"configurable": {"thread_id": trip.id}}
             inputs = {"trip_id": trip.id}
             try:
@@ -28,9 +54,44 @@ def create_trip(request):
             except Exception as e:
                 print(f"Error generating itinerary automatically: {e}")
             return redirect('trip_detail', trip_id=trip.id)
+    
+    # Calculate remaining_free_itineraries for both GET and POST (if not redirected)
+    remaining_free_itineraries = 2 - request.user.free_itineraries_count
+
+    return render(request, 'planner/create_trip.html', {
+        'form': form,
+        'payment_required': payment_required,
+        'trip_data': json.dumps(trip_data) if trip_data else '{}', # Ensure trip_data is JSON string
+        'remaining_free_itineraries': remaining_free_itineraries,
+    })
+
+# New view for creating trip after payment
+@login_required
+@require_POST
+def create_paid_trip(request):
+    form = TripForm(request.POST)
+    if form.is_valid():
+        user_profile = UserProfile.objects.get(user=request.user)
+        if user_profile.paid_plan_credits >= 5:
+            user_profile.paid_plan_credits -= 5
+            user_profile.save()
+
+            trip = form.save(commit=False)
+            trip.user = request.user
+            trip.save()
+            config = {"configurable": {"thread_id": trip.id}}
+            inputs = {"trip_id": trip.id}
+            try:
+                graph.invoke(inputs, config=config)
+                trip.refresh_from_db() # Refresh to get the generated itinerary
+            except Exception as e:
+                print(f"Error generating itinerary automatically: {e}")
+            return JsonResponse({'status': 'success', 'redirect_url': reverse('trip_detail', kwargs={'trip_id': trip.id})})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Insufficient balance.'}, status=400)
     else:
-        form = TripForm()
-    return render(request, 'planner/create_trip.html', {'form': form})
+        return JsonResponse({'status': 'error', 'message': 'Invalid form data', 'errors': form.errors}, status=400)
+
 
 @login_required
 def trip_detail(request, trip_id):

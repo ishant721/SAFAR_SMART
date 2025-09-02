@@ -39,12 +39,29 @@ In addition to the main workflow, several other agents are available to provide 
 
 This modular agent-based architecture ensures that each aspect of trip planning is handled by a specialized AI, leading to highly detailed, accurate, and personalized travel itineraries.
 
+## Payment System
+
+SafarSmart includes a payment system that allows users to add money to their wallets and use it to pay for itinerary generation. The payment system is built using Razorpay.
+
+### Features
+
+-   **Add Money to Wallet:** Users can add money to their wallets using Razorpay.
+-   **Pay for Itineraries:** Users can use their wallet balance to pay for itinerary generation after they have exhausted their free quota.
+-   **Payment History:** Users can view their payment history on their profile page.
+
+### Implementation Details
+
+-   **Backend:** The payment system is implemented in the `payments` app. It includes models for storing payment information, views for handling payment requests, and URLs for routing payment-related requests.
+-   **Frontend:** The payment-related pages are located in the `payments/templates/payments` directory. The user profile page is updated to display the wallet balance and provide an option to add money.
+-   **Payment Gateway:** Razorpay is used as the payment gateway. The Razorpay API keys are stored in environment variables.
+
 ## Technologies Used
 
 -   **Backend:** Python, Django
 -   **Database:** SQLite (default, can be configured for PostgreSQL, MySQL, etc.)
 -   **Frontend:** HTML, CSS, JavaScript
 -   **AI Integration:** Langchain, LangGraph
+-   **Payment Gateway:** Razorpay
 
 ## Installation
 
@@ -113,6 +130,7 @@ Follow these steps to set up and run SafarSmart on your local machine:
 -   `travel_planner/`: The main Django project configuration.
 -   `planner/`: Handles core trip planning logic, models, views, and templates.
 -   `users/`: Manages user authentication and profiles.
+-   `payments/`: Handles payment processing and history.
 -   `static/`: Contains static files like CSS, JavaScript, and images.
 -   `templates/`: Stores global HTML templates.
 

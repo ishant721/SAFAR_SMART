@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'users',
     'planner',
+    'payments',
 ]
 
 MIDDLEWARE = [
@@ -141,3 +142,7 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/dashboard/'
+
+# Razorpay Settings
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')

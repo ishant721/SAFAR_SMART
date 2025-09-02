@@ -42,4 +42,5 @@ urlpatterns = [
     path('forgot-password-otp-verify/', forgot_password_otp_verify_view, name='forgot-password-otp-verify'),
     path('reset-password/', forgot_password_confirm_view, name='reset-password'),
     path('planner/', include('planner.urls')),
+    path('payments/', include('payments.urls')),
 ]
