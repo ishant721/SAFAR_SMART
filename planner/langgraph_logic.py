@@ -15,22 +15,10 @@ import os
 load_dotenv()
 
 # Initialize LLM
-try:
-    if os.getenv("GOOGLE_API_KEY"):
-        llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", google_api_key=os.getenv("GOOGLE_API_KEY"))
-    else:
-        llm = None
-except Exception:
-    llm = None
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize GoogleSerperAPIWrapper
-try:
-    if os.getenv("SERPER_API_KEY"):
-        search = GoogleSerperAPIWrapper(serper_api_key=os.getenv("SERPER_API_KEY"))
-    else:
-        search = None
-except Exception:
-    search = None
+search = GoogleSerperAPIWrapper(serper_api_key=os.getenv("SERPER_API_KEY"))
 
 # Define state
 class GraphState(TypedDict):
