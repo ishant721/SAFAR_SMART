@@ -17,10 +17,10 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // Navbar scroll effect
 window.addEventListener('scroll', function() {
     const navbar = document.querySelector('.navbar-modern');
-    if (window.scrollY > 50) {
+    if (navbar && window.scrollY > 50) {
         navbar.style.background = 'rgba(255, 255, 255, 0.98)';
         navbar.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.1)';
-    } else {
+    } else if (navbar) {
         navbar.style.background = 'rgba(255, 255, 255, 0.95)';
         navbar.style.boxShadow = 'none';
     }
