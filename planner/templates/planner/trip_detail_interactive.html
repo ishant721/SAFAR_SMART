@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ trip.destination }} - Interactive Trip Planner{% endblock %}
+
+{% block extra_css %}
+<style>
+.trip-header {
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 0;
+}
+
+.progress-section {
+    background: #f8f9fa;
+    padding: 1rem 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.progress-bar-custom {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.weather-widget {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 20px;
+}
+
+.day-section {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.day-header {
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+    color: white;
+    padding: 1rem 1.5rem;
+    position: relative;
+}
+
+.activity-item {
+    border-left: 4px solid #8B4513;
+    margin: 1rem 0;
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-radius: 0 8px 8px 0;
+    transition: all 0.3s ease;
+}
+
+.activity-item.completed {
+    border-left-color: #28a745;
+    background: #d4edda;
+}
+
+.activity-item:hover {
+    transform: translateX(5px);
+}
+
+.btn-action {
+    background: #8B4513;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.btn-action:hover {
+    background: #A0522D;
+    color: white;
+}
+
+.tip-box {
+    background: #e8f5e8;
+    border-left: 4px solid #28a745;
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin-top: 0.5rem;
+}
+
+.experience-notes {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Trip Header -->
+<div class="trip-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2">📍 {{ trip.destination }}</h1>
+                <p class="mb-0">{{ trip.duration }} Days • {{ trip.month }} • Created {{ trip.created_at|date:"M j, Y"|default:"Sep 12, 2025" }}</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-light me-2">📊 Track Progress</button>
+                <button class="btn btn-warning">🤖 Travel Assistant</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Section -->
+<div class="progress-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-2">
+                <h6 class="mb-1">📈 Trip Progress</h6>
+                <small class="text-muted">{{ progress_data.completed_stops|default:0 }} of {{ progress_data.total_stops|default:14 }} checkpoints completed ({{ progress_data.progress_percentage|default:0 }}%)</small>
+            </div>
+            <div class="col-md-6">
+                <div class="progress-bar-custom">
+                    <div class="progress-fill" style="width: {{ progress_data.progress_percentage|default:0 }}%"></div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                    <span class="badge bg-primary">{{ progress_data.total_stops|default:14 }} Total Stops</span>
+                    <span class="badge bg-success">{{ progress_data.completed_stops|default:0 }} Completed</span>
+                    <span class="badge bg-warning">{{ progress_data.remaining_stops|default:14 }} Remaining</span>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-success me-2">▶️ Start Journey</button>
+                    <button class="btn btn-sm btn-warning me-2">🤖 Travel Assistant</button>
+                    <a href="{% url 'download_trip_pdf' trip.id %}" class="btn btn-sm btn-outline-primary">📄 Download PDF</a>
+                    <button class="btn btn-sm btn-outline-secondary">← Back</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Day 1 Section -->
+            <div class="day-section">
+                <div class="day-header">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                            <strong>1</strong>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Day 1</h5>
+                            <small>0/4 completed</small>
+                        </div>
+                    </div>
+                    <div class="progress-bar-custom mt-2" style="height: 4px;">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <!-- Activity Item -->
+                <div class="p-0">
+                    <div class="activity-item" id="activity-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="text-success me-2">⏰ 09:00</span>
+                                    <h6 class="mb-0">📍 Tashi Road, Gangtok</h6>
+                                </div>
+                                <p class="text-muted mb-2">Enjoy a panoramic view of Gangtok city and the surrounding mountains.</p>
+                                <div class="tip-box">
+                                    <small><strong>💡 Tip:</strong> Reach early to avoid crowds and enjoy the sunrise.</small>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-1')">✓ Complete</button>
+                            </div>
+                        </div>
+                        <div class="experience-notes mt-2" style="display: none;">
+                            <textarea class="form-control" placeholder="Add your experience notes..." rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Second Activity -->
+                    <div class="activity-item" id="activity-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="text-success me-2">⏰ 10:30</span>
+                                    <h6 class="mb-0">🏛️ Rumtek Monastery</h6>
+                                </div>
+                                <p class="text-muted mb-2">Visit one of the most important Tibetan Buddhist monasteries.</p>
+                                <div class="tip-box">
+                                    <small><strong>💡 Tip:</strong> Dress modestly and respect the prayer timings.</small>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-2')">✓ Complete</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- More activities can be added here -->
+                    <div class="activity-item" id="activity-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="text-success me-2">⏰ 14:00</span>
+                                    <h6 class="mb-0">🍜 Local Food Tour</h6>
+                                </div>
+                                <p class="text-muted mb-2">Try authentic Sikkimese cuisine including momos and thukpa.</p>
+                            </div>
+                            <div class="ms-3">
+                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-3')">✓ Complete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Show existing itinerary if available -->
+            {% if trip.complete_trip_plan %}
+            <div class="day-section">
+                <div class="day-header">
+                    <h5 class="mb-0">📋 Complete AI-Generated Itinerary</h5>
+                </div>
+                <div class="p-4">
+                    <div class="rendered-content">{{ trip.complete_trip_plan|safe }}</div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center p-4">
+                <button class="btn btn-primary" onclick="processTrip('complete_trip_plan', {{ trip.id }})">
+                    🤖 Generate Complete AI Itinerary
+                </button>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Weather Widget -->
+            <div class="weather-widget mb-4">
+                <h6 class="mb-3">🌤️ Current Weather</h6>
+                {% if weather_data %}
+                <div class="text-center">
+                    <div class="display-4 mb-2">☁️</div>
+                    <h3 class="mb-1">{{ weather_data.temperature }}°C</h3>
+                    <p class="text-muted mb-3">{{ weather_data.condition|title }}</p>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Feels like</small>
+                            <div><strong>{{ weather_data.temperature }}°C</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Humidity</small>
+                            <div><strong>{{ weather_data.humidity }}%</strong></div>
+                        </div>
+                        <div class="col-6 mt-2">
+                            <small class="text-muted">Wind</small>
+                            <div><strong>{{ weather_data.wind_speed }} m/s</strong></div>
+                        </div>
+                        <div class="col-6 mt-2">
+                            <small class="text-muted">Visibility</small>
+                            <div><strong>{{ weather_data.visibility }} km</strong></div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-light btn-sm mt-3 w-100">🔄 Refresh</button>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">Weather data unavailable</p>
+                {% endif %}
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">🚀 Quick Actions</h6>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm">📱 View Activities</button>
+                        <button class="btn btn-outline-success btn-sm">🏨 Accommodation</button>
+                        <button class="btn btn-outline-warning btn-sm">💰 Expenses</button>
+                        <button class="btn btn-outline-info btn-sm">🎒 Packing List</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function markComplete(activityId) {
+    const activity = document.getElementById(activityId);
+    const button = activity.querySelector('.btn-action');
+    const notesDiv = activity.querySelector('.experience-notes');
+    
+    if (activity.classList.contains('completed')) {
+        // Mark as incomplete
+        activity.classList.remove('completed');
+        button.innerHTML = '✓ Complete';
+        button.classList.remove('btn-success');
+        button.classList.add('btn-action');
+        notesDiv.style.display = 'none';
+    } else {
+        // Mark as complete
+        activity.classList.add('completed');
+        button.innerHTML = '✓ Completed';
+        button.classList.remove('btn-action');
+        button.classList.add('btn-success');
+        notesDiv.style.display = 'block';
+        
+        // Update progress
+        updateProgress();
+    }
+}
+
+function updateProgress() {
+    const total = document.querySelectorAll('.activity-item').length;
+    const completed = document.querySelectorAll('.activity-item.completed').length;
+    const percentage = Math.round((completed / total) * 100);
+    
+    // Update progress bars
+    document.querySelectorAll('.progress-fill').forEach(fill => {
+        fill.style.width = percentage + '%';
+    });
+    
+    // Update badges
+    const completedBadge = document.querySelector('.badge.bg-success');
+    const remainingBadge = document.querySelector('.badge.bg-warning');
+    
+    if (completedBadge) completedBadge.textContent = completed + ' Completed';
+    if (remainingBadge) remainingBadge.textContent = (total - completed) + ' Remaining';
+}
+
+function processTrip(agentName, tripId) {
+    showLoading(`Generating ${agentName.replace('_', ' ')}...`);
+    
+    fetch(`/planner/process_trip/${tripId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `agent_name=${agentName}&user_question=Generate ${agentName.replace('_', ' ')}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.status === 'success') {
+            showNotification('Itinerary generated successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showNotification('An error occurred while processing your request.', 'error');
+    });
+}
+</script>
+{% endblock %}

@@ -20,3 +20,5 @@ langgraph
 markdown
 python-dotenv
 razorpay
+fpdf2
+requests

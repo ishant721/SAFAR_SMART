@@ -4,12 +4,17 @@ from django.contrib.auth.decorators import login_required
 from .models import Trip, ChatMessage
 from .forms import TripForm
 from .langgraph_logic import graph, generate_itinerary, recommend_activities_agent, fetch_useful_links_agent, weather_forecaster_agent, packing_list_generator_agent, food_culture_recommender_agent, chat_agent, accommodation_recommender_agent, expense_breakdown_agent, complete_trip_plan_agent
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import json
 from django.urls import reverse # Added import
 from django.views.decorators.http import require_POST # Added import
 from users.models import UserProfile
 from django.contrib import messages
+from fpdf import FPDF
+import requests
+import os
+from datetime import datetime
+import re
 
 @login_required
 def dashboard(request):
@@ -96,7 +101,19 @@ def create_paid_trip(request):
 @login_required
 def trip_detail(request, trip_id):
     trip = Trip.objects.get(id=trip_id, user=request.user)
-    return render(request, 'planner/trip_detail.html', {'trip': trip})
+    
+    # Get weather data for the destination
+    weather_data = get_current_weather(trip.destination)
+    
+    # Calculate progress - using existing data structure
+    progress_data = calculate_trip_progress(trip)
+    
+    context = {
+        'trip': trip,
+        'weather_data': weather_data,
+        'progress_data': progress_data,
+    }
+    return render(request, 'planner/trip_detail_interactive.html', context)
 
 @login_required
 def process_trip(request, trip_id):
