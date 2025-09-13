@@ -29,6 +29,13 @@
                 {% endfor %}
             {% endif %}
             
+            {% if success_message %}
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>{{ success_message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endif %}
+            
             {% if form.errors %}
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     {% for field in form %}

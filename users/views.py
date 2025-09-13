@@ -58,9 +58,14 @@ class VerifyOTPView(generics.GenericAPIView):
             return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
 
         user.is_active = True
+        user.otp = None  # Clear OTP after successful verification
+        user.otp_created_at = None
         user.save()
 
-        return Response({"message": "Email verified successfully."}, status=status.HTTP_200_OK)
+        return Response({
+            "message": "Email verified successfully.", 
+            "redirect_url": "/login/?verified=1"
+        }, status=status.HTTP_200_OK)
 
 class ResendOTPView(generics.GenericAPIView):
     serializer_class = ResendOTPSerializer
@@ -106,6 +111,7 @@ def interactive_register_view(request):
     return render(request, 'register.html')
 
 def login_view(request):
+    verified = request.GET.get('verified')
     if request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
@@ -140,7 +146,12 @@ def login_view(request):
                 form.add_error(None, "Invalid email or password.")
     else:
         form = LoginForm()
-    return render(request, 'login.html', {'form': form})
+    
+    context = {'form': form}
+    if verified:
+        context['success_message'] = "Account verified successfully! You can now login."
+    
+    return render(request, 'login.html', context)
 
 
 
