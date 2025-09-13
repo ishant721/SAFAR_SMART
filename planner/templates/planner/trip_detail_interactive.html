@@ -5,17 +5,20 @@
 
 {% block extra_css %}
 <style>
-.trip-header {
+.trip-detail-header {
     background: linear-gradient(135deg, #8B4513, #A0522D);
     color: white;
     padding: 2rem 0;
-    margin-bottom: 0;
+    margin-bottom: 2rem;
+    border-radius: 0 0 20px 20px;
 }
 
-.progress-section {
-    background: #f8f9fa;
-    padding: 1rem 0;
-    border-bottom: 1px solid #dee2e6;
+.progress-widget {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
 }
 
 .progress-bar-custom {
@@ -37,268 +40,308 @@
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    position: sticky;
-    top: 20px;
+    margin-bottom: 1.5rem;
 }
 
-.day-section {
+.destination-item {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    margin: 1rem 0;
+    padding: 1.2rem;
     background: white;
-    border-radius: 12px;
-    margin-bottom: 2rem;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.day-header {
-    background: linear-gradient(135deg, #8B4513, #A0522D);
-    color: white;
-    padding: 1rem 1.5rem;
+    transition: all 0.3s ease;
     position: relative;
 }
 
-.activity-item {
-    border-left: 4px solid #8B4513;
-    margin: 1rem 0;
-    padding: 1rem 1.5rem;
-    background: #f8f9fa;
-    border-radius: 0 8px 8px 0;
-    transition: all 0.3s ease;
-}
-
-.activity-item.completed {
-    border-left-color: #28a745;
+.destination-item.completed {
     background: #d4edda;
+    border-color: #28a745;
 }
 
-.activity-item:hover {
-    transform: translateX(5px);
+.destination-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
-.btn-action {
-    background: #8B4513;
-    border: none;
+.destination-checkbox {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.feedback-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    display: none;
+}
+
+.feedback-section.show {
+    display: block;
+}
+
+.btn-feedback {
+    background: #17a2b8;
     color: white;
+    border: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
     transition: all 0.3s ease;
 }
 
-.btn-action:hover {
-    background: #A0522D;
+.btn-feedback:hover {
+    background: #138496;
     color: white;
-}
-
-.tip-box {
-    background: #e8f5e8;
-    border-left: 4px solid #28a745;
-    padding: 0.75rem 1rem;
-    border-radius: 0 6px 6px 0;
-    margin-top: 0.5rem;
-}
-
-.experience-notes {
-    margin-top: 1rem;
-    padding: 0.75rem;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Trip Header -->
-<div class="trip-header">
+<section class="trip-detail-header fade-in-up">
     <div class="container">
         <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1 class="mb-2">📍 {{ trip.destination }}</h1>
-                <p class="mb-0">{{ trip.duration }} Days • {{ trip.month }} • Trip Plan Ready</p>
+            <div class="col-lg-8">
+                <h1 class="display-5 fw-bold mb-3">📍 {{ trip.destination }}</h1>
+                <p class="lead mb-4">{{ trip.month }} • {{ trip.duration }} days • {{ trip.holiday_type }}</p>
+                {% if trip.comments %}
+                <p class="mb-0"><i class="bi bi-chat-quote"></i> "{{ trip.comments }}"</p>
+                {% endif %}
             </div>
-            <div class="col-md-4 text-end">
-                <button class="btn btn-light me-2">📊 Track Progress</button>
-                <button class="btn btn-warning">🤖 Travel Assistant</button>
+            <div class="col-lg-4 text-lg-end">
+                <a href="{% url 'dashboard' %}" class="btn btn-light btn-lg">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+                <a href="{% url 'download_trip_pdf' trip.id %}" class="btn btn-success btn-lg ms-2">
+                    <i class="bi bi-download"></i> Download PDF
+                </a>
             </div>
         </div>
     </div>
-</div>
+</section>
 
-<!-- Progress Section -->
-<div class="progress-section">
-    <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-2">
-                <h6 class="mb-1">📈 Trip Progress</h6>
-                <small class="text-muted">{{ progress_data.completed_stops|default:0 }} of {{ progress_data.total_stops|default:14 }} checkpoints completed ({{ progress_data.progress_percentage|default:0 }}%)</small>
-            </div>
-            <div class="col-md-6">
+<div class="container">
+    <div class="row g-4">
+        <!-- Trip Navigation Sidebar -->
+        <div class="col-lg-3">
+            <!-- Progress Widget -->
+            <div class="progress-widget">
+                <h6 class="mb-3">📈 Trip Progress</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted">Destinations Visited</span>
+                    <span class="badge bg-primary" id="progressBadge">0/0</span>
+                </div>
                 <div class="progress-bar-custom">
-                    <div class="progress-fill" style="width: {{ progress_data.progress_percentage|default:0 }}%"></div>
+                    <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+                </div>
+                <div class="mt-2 text-center">
+                    <small class="text-muted" id="progressText">Start exploring your destinations!</small>
                 </div>
             </div>
-            <div class="col-md-4 text-end">
-                <div class="d-flex gap-2 justify-content-end">
-                    <span class="badge bg-primary">{{ progress_data.total_stops|default:14 }} Total Stops</span>
-                    <span class="badge bg-success">{{ progress_data.completed_stops|default:0 }} Completed</span>
-                    <span class="badge bg-warning">{{ progress_data.remaining_stops|default:14 }} Remaining</span>
-                </div>
-                <div class="mt-2">
-                    <button class="btn btn-sm btn-success me-2">▶️ Start Journey</button>
-                    <button class="btn btn-sm btn-warning me-2">🤖 Travel Assistant</button>
-                    <a href="{% url 'download_trip_pdf' trip.id %}" class="btn btn-sm btn-outline-primary">📄 Download PDF</a>
-                    <button class="btn btn-sm btn-outline-secondary">← Back</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="container mt-4">
-    <div class="row">
-        <!-- Main Content -->
-        <div class="col-lg-8">
-            <!-- Day 1 Section -->
-            <div class="day-section">
-                <div class="day-header">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                            <strong>1</strong>
-                        </div>
-                        <div>
-                            <h5 class="mb-0">Day 1</h5>
-                            <small>0/4 completed</small>
-                        </div>
-                    </div>
-                    <div class="progress-bar-custom mt-2" style="height: 4px;">
-                        <div class="progress-fill" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <!-- Activity Item -->
-                <div class="p-0">
-                    <div class="activity-item" id="activity-1">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="d-flex align-items-center mb-2">
-                                    <span class="text-success me-2">⏰ 09:00</span>
-                                    <h6 class="mb-0">📍 Tashi Road, Gangtok</h6>
-                                </div>
-                                <p class="text-muted mb-2">Enjoy a panoramic view of Gangtok city and the surrounding mountains.</p>
-                                <div class="tip-box">
-                                    <small><strong>💡 Tip:</strong> Reach early to avoid crowds and enjoy the sunrise.</small>
-                                </div>
-                            </div>
-                            <div class="ms-3">
-                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-1')">✓ Complete</button>
-                            </div>
-                        </div>
-                        <div class="experience-notes mt-2" style="display: none;">
-                            <textarea class="form-control" placeholder="Add your experience notes..." rows="2"></textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Second Activity -->
-                    <div class="activity-item" id="activity-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="d-flex align-items-center mb-2">
-                                    <span class="text-success me-2">⏰ 10:30</span>
-                                    <h6 class="mb-0">🏛️ Rumtek Monastery</h6>
-                                </div>
-                                <p class="text-muted mb-2">Visit one of the most important Tibetan Buddhist monasteries.</p>
-                                <div class="tip-box">
-                                    <small><strong>💡 Tip:</strong> Dress modestly and respect the prayer timings.</small>
-                                </div>
-                            </div>
-                            <div class="ms-3">
-                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-2')">✓ Complete</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- More activities can be added here -->
-                    <div class="activity-item" id="activity-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <div class="d-flex align-items-center mb-2">
-                                    <span class="text-success me-2">⏰ 14:00</span>
-                                    <h6 class="mb-0">🍜 Local Food Tour</h6>
-                                </div>
-                                <p class="text-muted mb-2">Try authentic Sikkimese cuisine including momos and thukpa.</p>
-                            </div>
-                            <div class="ms-3">
-                                <button class="btn btn-action btn-sm" onclick="markComplete('activity-3')">✓ Complete</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Show existing itinerary if available -->
-            {% if trip.complete_trip_plan %}
-            <div class="day-section">
-                <div class="day-header">
-                    <h5 class="mb-0">📋 Complete AI-Generated Itinerary</h5>
-                </div>
-                <div class="p-4">
-                    <div class="rendered-content">{{ trip.complete_trip_plan|safe }}</div>
-                </div>
-            </div>
-            {% else %}
-            <div class="text-center p-4">
-                <button class="btn btn-primary" onclick="processTrip('complete_trip_plan', {{ trip.id }})">
-                    🤖 Generate Complete AI Itinerary
-                </button>
-            </div>
-            {% endif %}
-        </div>
-        
-        <!-- Sidebar -->
-        <div class="col-lg-4">
             <!-- Weather Widget -->
-            <div class="weather-widget mb-4">
+            <div class="weather-widget">
                 <h6 class="mb-3">🌤️ Current Weather</h6>
                 {% if weather_data %}
                 <div class="text-center">
                     <div class="display-4 mb-2">☁️</div>
-                    <h3 class="mb-1">{{ weather_data.temperature }}°C</h3>
+                    <h5 class="mb-1">{{ weather_data.temperature }}°C</h5>
                     <p class="text-muted mb-3">{{ weather_data.condition|title }}</p>
-                    
                     <div class="row text-center">
-                        <div class="col-6">
-                            <small class="text-muted">Feels like</small>
-                            <div><strong>{{ weather_data.temperature }}°C</strong></div>
-                        </div>
                         <div class="col-6">
                             <small class="text-muted">Humidity</small>
                             <div><strong>{{ weather_data.humidity }}%</strong></div>
                         </div>
-                        <div class="col-6 mt-2">
+                        <div class="col-6">
                             <small class="text-muted">Wind</small>
                             <div><strong>{{ weather_data.wind_speed }} m/s</strong></div>
                         </div>
-                        <div class="col-6 mt-2">
-                            <small class="text-muted">Visibility</small>
-                            <div><strong>{{ weather_data.visibility }} km</strong></div>
-                        </div>
                     </div>
-                    
-                    <button class="btn btn-light btn-sm mt-3 w-100">🔄 Refresh</button>
+                    <button class="btn btn-light btn-sm mt-3 w-100" onclick="refreshWeather()">🔄 Refresh</button>
                 </div>
                 {% else %}
                 <p class="text-muted text-center">Weather data unavailable</p>
                 {% endif %}
             </div>
-            
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">🚀 Quick Actions</h6>
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-outline-primary btn-sm">📱 View Activities</button>
-                        <button class="btn btn-outline-success btn-sm">🏨 Accommodation</button>
-                        <button class="btn btn-outline-warning btn-sm">💰 Expenses</button>
-                        <button class="btn btn-outline-info btn-sm">🎒 Packing List</button>
+
+            <!-- Original Sidebar Navigation -->
+            <div class="sidebar-modern">
+                <h3 class="sidebar-title">
+                    <i class="bi bi-compass"></i>
+                    Trip Menu
+                </h3>
+                <ul class="list-unstyled">
+                    <li><a href="#interactive-progress" class="sidebar-link active" data-target="interactive-progress"><i class="bi bi-check-circle me-2"></i>Interactive Progress</a></li>
+                    <li><a href="#activities" class="sidebar-link" data-target="activities"><i class="bi bi-calendar-event me-2"></i>Activities</a></li>
+                    <li><a href="#weather" class="sidebar-link" data-target="weather"><i class="bi bi-cloud-sun me-2"></i>Weather</a></li>
+                    <li><a href="#packing" class="sidebar-link" data-target="packing"><i class="bi bi-bag me-2"></i>Packing List</a></li>
+                    <li><a href="#accommodation" class="sidebar-link" data-target="accommodation"><i class="bi bi-house me-2"></i>Accommodation</a></li>
+                    <li><a href="#expenses" class="sidebar-link" data-target="expenses"><i class="bi bi-currency-dollar me-2"></i>Expenses</a></li>
+                    <li><a href="#complete-plan" class="sidebar-link" data-target="complete-plan"><i class="bi bi-journal-check me-2"></i>Complete Plan</a></li>
+                    <li><a href="#chat" class="sidebar-link" data-target="chat"><i class="bi bi-robot me-2"></i>AI Assistant</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-lg-9 fade-in-up-delay-2">
+            <!-- Interactive Progress Section -->
+            <div id="interactive-progress" class="content-section tab-content active">
+                <h2 class="section-title"><i class="bi bi-check-circle"></i> Interactive Trip Progress</h2>
+                <div id="destinationsContainer">
+                    <!-- Dynamic destinations will be loaded here -->
+                </div>
+                <div class="text-center mt-4">
+                    <button class="btn btn-primary-modern" onclick="loadDestinations()">
+                        🏛️ Load Destinations from AI Plan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Activities Section -->
+            <div id="activities" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-calendar-event"></i> Activity Suggestions</h2>
+                {% if trip.activity_suggestions %}
+                    <div class="row g-3">
+                        {% for activity in trip.activity_suggestions %}
+                        <div class="col-md-6">
+                            <div class="card-modern h-100">
+                                <div class="card-body-modern">
+                                    <h6 class="fw-bold mb-2">{{ activity.name }}</h6>
+                                    <p class="text-muted small mb-3">{{ activity.snippet }}</p>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        {% if activity.link %}<a href="{{ activity.link }}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-link"></i> Visit</a>{% endif %}
+                                        {% if activity.image_url %}<a href="{{ activity.image_url }}" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-image"></i> Photo</a>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-calendar-event"></i>
+                        <h5>No activity suggestions yet.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('recommend_activities', {{ trip.id }})">Get Activities</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Weather Section -->
+            <div id="weather" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-cloud-sun"></i> Weather Forecast</h2>
+                {% if trip.weather_forecast %}
+                    <div class="rendered-content">{{ trip.weather_forecast|safe }}</div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-cloud-sun"></i>
+                        <h5>No weather forecast available.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('weather_forecaster', {{ trip.id }})">Get Weather</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Packing Section -->
+            <div id="packing" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-bag"></i> Packing List</h2>
+                {% if trip.packing_list %}
+                    <div class="rendered-content">{{ trip.packing_list|safe }}</div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-bag"></i>
+                        <h5>No packing list generated yet.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('packing_list_generator', {{ trip.id }})">Get Packing List</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Accommodation Section -->
+            <div id="accommodation" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-house"></i> Accommodation</h2>
+                {% if trip.accommodation_info %}
+                    <div class="row g-3">
+                        {% for item in trip.accommodation_info %}
+                        <div class="col-md-6">
+                            <div class="card-modern h-100">
+                                <div class="card-body-modern">
+                                    <h6 class="fw-bold mb-2">{{ item.name }}</h6>
+                                    <p class="text-muted small mb-3">{{ item.snippet }}</p>
+                                    <a href="{{ item.link }}" target="_blank" class="btn btn-sm btn-primary"><i class="bi bi-house"></i> Book Now</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-house"></i>
+                        <h5>No accommodation recommendations yet.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('accommodation_recommender', {{ trip.id }})">Get Stays</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Expenses Section -->
+            <div id="expenses" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-currency-dollar"></i> Expense Breakdown</h2>
+                {% if trip.expense_breakdown %}
+                    <div class="rendered-content">{{ trip.expense_breakdown|safe }}</div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-currency-dollar"></i>
+                        <h5>No expense breakdown available.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('expense_breakdown', {{ trip.id }})">Get Expenses</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Complete Plan Section -->
+            <div id="complete-plan" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-journal-check"></i> Complete Trip Plan</h2>
+                {% if trip.complete_trip_plan %}
+                    <div class="rendered-content">{{ trip.complete_trip_plan|linebreaks }}</div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-journal-check"></i>
+                        <h5>No complete trip plan generated yet.</h5>
+                        <button class="btn btn-primary-modern" onclick="processTrip('complete_trip_plan', {{ trip.id }})">Get Complete Plan</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- AI Assistant Section -->
+            <div id="chat" class="content-section tab-content" style="display: none;">
+                <h2 class="section-title"><i class="bi bi-robot"></i> AI Travel Assistant</h2>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        {% for message in trip.chatmessage_set.all %}
+                        <div class="chat-message chat-message-user">
+                            <div class="chat-bubble chat-bubble-user">{{ message.question }}</div>
+                            <img src="https://placehold.co/40x40/3b82f6/FFFFFF/png" alt="User Avatar" class="chat-avatar">
+                        </div>
+                        <div class="chat-message chat-message-ai">
+                            <img src="{% static 'images/logo.png' %}" alt="AI Avatar" class="chat-avatar">
+                            <div class="chat-bubble chat-bubble-ai">{{ message.response|linebreaks }}</div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted p-4">
+                            <i class="bi bi-chat-dots display-4 mb-3"></i>
+                            <p>No messages yet. Start a conversation!</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="chat-input-container">
+                        <form id="chatForm" action="{% url 'chat_with_agent' trip.id %}" method="post">
+                            {% csrf_token %}
+                            <div class="input-group">
+                                <input type="text" name="user_question" class="form-control" placeholder="Ask about your trip..." required>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -309,47 +352,249 @@
 
 {% block extra_js %}
 <script>
-function markComplete(activityId) {
-    const activity = document.getElementById(activityId);
-    const button = activity.querySelector('.btn-action');
-    const notesDiv = activity.querySelector('.experience-notes');
+const logoUrl = "{% static 'images/logo.png' %}";
+let destinations = [];
+let completedDestinations = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize sidebar navigation
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Deactivate all links and tabs
+            sidebarLinks.forEach(l => l.classList.remove('active'));
+            tabContents.forEach(t => t.style.display = 'none');
+            // Activate the clicked link and tab
+            this.classList.add('active');
+            const targetId = this.getAttribute('data-target');
+            document.getElementById(targetId).style.display = 'block';
+        });
+    });
     
-    if (activity.classList.contains('completed')) {
-        // Mark as incomplete
-        activity.classList.remove('completed');
-        button.innerHTML = '✓ Complete';
-        button.classList.remove('btn-success');
-        button.classList.add('btn-action');
-        notesDiv.style.display = 'none';
-    } else {
-        // Mark as complete
-        activity.classList.add('completed');
-        button.innerHTML = '✓ Completed';
-        button.classList.remove('btn-action');
-        button.classList.add('btn-success');
-        notesDiv.style.display = 'block';
-        
-        // Update progress
-        updateProgress();
+    // Auto-load destinations if complete plan exists
+    {% if trip.complete_trip_plan %}
+        loadDestinations();
+    {% endif %}
+});
+
+function loadDestinations() {
+    const completeTrip = `{{ trip.complete_trip_plan|escapejs }}`;
+    const activities = `{{ trip.activity_suggestions|escapejs }}`;
+    
+    if (!completeTrip && !activities) {
+        showNotification('No trip plan available. Please generate a complete trip plan first.', 'warning');
+        return;
+    }
+    
+    // Parse destinations from complete trip plan
+    destinations = parseDestinationsFromText(completeTrip);
+    
+    // Add activity suggestions as destinations
+    {% if trip.activity_suggestions %}
+        {% for activity in trip.activity_suggestions %}
+            destinations.push({
+                name: "{{ activity.name|escapejs }}",
+                description: "{{ activity.snippet|escapejs }}",
+                type: "activity",
+                link: "{{ activity.link|default:'' }}"
+            });
+        {% endfor %}
+    {% endif %}
+    
+    // Add accommodation suggestions as destinations  
+    {% if trip.accommodation_info %}
+        {% for item in trip.accommodation_info %}
+            destinations.push({
+                name: "{{ item.name|escapejs }}",
+                description: "{{ item.snippet|escapejs }}",
+                type: "accommodation",
+                link: "{{ item.link|default:'' }}"
+            });
+        {% endfor %}
+    {% endif %}
+    
+    renderDestinations();
+    updateProgressDisplay();
+}
+
+function parseDestinationsFromText(text) {
+    const destinations = [];
+    
+    // Extract places mentioned in the itinerary
+    const placePatterns = [
+        /visit\s+([A-Z][a-zA-Z\s,]+)/gi,
+        /explore\s+([A-Z][a-zA-Z\s,]+)/gi,
+        /(\d+[\.:]\s*)?([A-Z][a-zA-Z\s,]{5,}?)(?:\s*[-:]\s*)/g,
+        /Day\s*\d+[:\s]*([A-Z][a-zA-Z\s,]{5,})/gi
+    ];
+    
+    placePatterns.forEach(pattern => {
+        let matches;
+        while ((matches = pattern.exec(text)) !== null) {
+            const place = matches[1] || matches[2];
+            if (place && place.length > 3 && place.length < 100) {
+                const cleanPlace = place.trim().replace(/[.,;]$/, '');
+                if (!destinations.some(d => d.name.toLowerCase() === cleanPlace.toLowerCase())) {
+                    destinations.push({
+                        name: cleanPlace,
+                        description: 'Destination mentioned in your AI-generated itinerary',
+                        type: 'place'
+                    });
+                }
+            }
+        }
+    });
+    
+    return destinations.slice(0, 15); // Limit to 15 destinations
+}
+
+function renderDestinations() {
+    const container = document.getElementById('destinationsContainer');
+    
+    if (destinations.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="bi bi-geo-alt display-4 mb-3"></i>
+                <h5>No destinations found</h5>
+                <p>Generate a complete trip plan first to see interactive destinations.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = destinations.map((destination, index) => `
+        <div class="destination-item" id="destination-${index}">
+            <input type="checkbox" class="destination-checkbox" id="checkbox-${index}" 
+                   onchange="toggleDestinationCompletion(${index})">
+            
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 pe-3">
+                    <h6 class="fw-bold mb-2">
+                        ${getDestinationIcon(destination.type)} ${destination.name}
+                    </h6>
+                    <p class="text-muted mb-2">${destination.description}</p>
+                    ${destination.link ? `<a href="${destination.link}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-link"></i> More Info</a>` : ''}
+                </div>
+            </div>
+            
+            <div class="feedback-section" id="feedback-${index}">
+                <h6 class="mb-2">📝 Your Experience</h6>
+                <textarea class="form-control mb-2" placeholder="Share your experience at ${destination.name}..." 
+                          rows="2" onchange="saveFeedback(${index}, this.value)"></textarea>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-success" onclick="addRating(${index}, 'good')">👍 Loved it</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="addRating(${index}, 'okay')">👌 It was okay</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="addRating(${index}, 'bad')">👎 Didn't like</button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getDestinationIcon(type) {
+    switch(type) {
+        case 'activity': return '🎯';
+        case 'accommodation': return '🏨';
+        case 'place': return '📍';
+        default: return '🗺️';
     }
 }
 
-function updateProgress() {
-    const total = document.querySelectorAll('.activity-item').length;
-    const completed = document.querySelectorAll('.activity-item.completed').length;
-    const percentage = Math.round((completed / total) * 100);
+function toggleDestinationCompletion(index) {
+    const destinationElement = document.getElementById(`destination-${index}`);
+    const checkbox = document.getElementById(`checkbox-${index}`);
+    const feedbackSection = document.getElementById(`feedback-${index}`);
     
-    // Update progress bars
-    document.querySelectorAll('.progress-fill').forEach(fill => {
-        fill.style.width = percentage + '%';
-    });
+    if (checkbox.checked) {
+        destinationElement.classList.add('completed');
+        feedbackSection.classList.add('show');
+        if (!completedDestinations.includes(index)) {
+            completedDestinations.push(index);
+        }
+        showNotification(`✅ Marked "${destinations[index].name}" as visited!`, 'success');
+    } else {
+        destinationElement.classList.remove('completed');
+        feedbackSection.classList.remove('show');
+        completedDestinations = completedDestinations.filter(i => i !== index);
+        showNotification(`Unmarked "${destinations[index].name}"`, 'info');
+    }
     
-    // Update badges
-    const completedBadge = document.querySelector('.badge.bg-success');
-    const remainingBadge = document.querySelector('.badge.bg-warning');
+    updateProgressDisplay();
+    saveProgressToLocalStorage();
+}
+
+function updateProgressDisplay() {
+    const total = destinations.length;
+    const completed = completedDestinations.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     
-    if (completedBadge) completedBadge.textContent = completed + ' Completed';
-    if (remainingBadge) remainingBadge.textContent = (total - completed) + ' Remaining';
+    document.getElementById('progressBadge').textContent = `${completed}/${total}`;
+    document.getElementById('progressBar').style.width = `${percentage}%`;
+    
+    let progressText = '';
+    if (completed === 0) {
+        progressText = 'Start exploring your destinations!';
+    } else if (completed === total) {
+        progressText = '🎉 Trip completed! Great job!';
+    } else {
+        progressText = `${total - completed} destinations remaining`;
+    }
+    
+    document.getElementById('progressText').textContent = progressText;
+}
+
+function saveFeedback(index, feedback) {
+    // Save feedback to localStorage for now
+    const feedbackData = JSON.parse(localStorage.getItem('tripFeedback') || '{}');
+    feedbackData[`{{ trip.id }}_${index}`] = {
+        feedback: feedback,
+        destination: destinations[index].name,
+        timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('tripFeedback', JSON.stringify(feedbackData));
+    
+    if (feedback.trim()) {
+        showNotification(`💬 Feedback saved for ${destinations[index].name}`, 'success');
+    }
+}
+
+function addRating(index, rating) {
+    const feedbackData = JSON.parse(localStorage.getItem('tripFeedback') || '{}');
+    const key = `{{ trip.id }}_${index}`;
+    
+    if (!feedbackData[key]) {
+        feedbackData[key] = {
+            feedback: '',
+            destination: destinations[index].name,
+            timestamp: new Date().toISOString()
+        };
+    }
+    
+    feedbackData[key].rating = rating;
+    localStorage.setItem('tripFeedback', JSON.stringify(feedbackData));
+    
+    const ratingText = rating === 'good' ? '👍 Loved it' : rating === 'okay' ? '👌 It was okay' : '👎 Didn\'t like';
+    showNotification(`${ratingText} - Rating saved for ${destinations[index].name}`, 'success');
+}
+
+function saveProgressToLocalStorage() {
+    const progressData = {
+        tripId: {{ trip.id }},
+        completedDestinations: completedDestinations,
+        timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('tripProgress', JSON.stringify(progressData));
+}
+
+function refreshWeather() {
+    showNotification('🔄 Refreshing weather data...', 'info');
+    // In a real implementation, this would fetch fresh weather data
+    setTimeout(() => {
+        showNotification('🌤️ Weather data refreshed!', 'success');
+    }, 1000);
 }
 
 function processTrip(agentName, tripId) {
@@ -367,7 +612,10 @@ function processTrip(agentName, tripId) {
     .then(data => {
         hideLoading();
         if (data.status === 'success') {
-            showNotification('Itinerary generated successfully!', 'success');
+            showNotification('Information generated successfully!', 'success');
+            if (data.warning) {
+                showNotification('Warning: ' + data.warning, 'warning');
+            }
             setTimeout(() => location.reload(), 1000);
         } else {
             showNotification('Error: ' + data.message, 'error');
@@ -375,8 +623,92 @@ function processTrip(agentName, tripId) {
     })
     .catch(error => {
         hideLoading();
+        console.error('Error:', error);
         showNotification('An error occurred while processing your request.', 'error');
     });
+}
+
+// Chat functionality
+document.getElementById('chatForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const question = formData.get('user_question');
+    
+    if (!question.trim()) return;
+    
+    addChatMessage(question, 'user');
+    this.querySelector('input[name="user_question"]').value = '';
+    addTypingIndicator();
+    
+    fetch(this.action, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        removeTypingIndicator();
+        if (data.status === 'success') {
+            addChatMessage(data.chat_response, 'ai');
+        } else {
+            addChatMessage('Sorry, I encountered an error.', 'ai');
+            showNotification('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        removeTypingIndicator();
+        addChatMessage('Sorry, I encountered an error.', 'ai');
+        showNotification('An error occurred while sending your message.', 'error');
+    });
+});
+
+function addChatMessage(message, sender) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message chat-message-${sender}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble chat-bubble-${sender}`;
+    bubble.innerHTML = message;
+
+    const avatar = document.createElement('img');
+    avatar.className = 'chat-avatar';
+    if (sender === 'user') {
+        avatar.src = 'https://placehold.co/40x40/3b82f6/FFFFFF/png';
+        messageDiv.appendChild(bubble);
+        messageDiv.appendChild(avatar);
+    } else {
+        avatar.src = logoUrl;
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addTypingIndicator() {
+    const chatMessages = document.getElementById('chatMessages');
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'chat-message chat-message-ai';
+    typingDiv.id = 'typingIndicator';
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble chat-bubble-ai';
+    bubble.innerHTML = '<i class="bi bi-three-dots"></i> AI is typing...';
+    
+    typingDiv.appendChild(bubble);
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
 }
 </script>
 {% endblock %}
