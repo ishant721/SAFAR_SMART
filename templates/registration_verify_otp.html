@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Complete Registration - SAFAR_SMART{% endblock %}
+
+{% block container_class %}container-fluid{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm border-0" style="border-radius: 20px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <div class="mb-4">
+                        <div class="feature-icon bg-gradient-success mx-auto mb-3" style="width: 80px; height: 80px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-envelope-check" style="font-size: 2rem; color: white;"></i>
+                        </div>
+                    </div>
+                    <h2 class="fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Complete Your Registration</h2>
+                    <p style="color: #6b7280; font-size: 1.1rem;">We've sent a verification code to <strong>{{ email }}</strong></p>
+                    <p class="text-muted">Enter the 6-digit code to activate your account</p>
+                </div>
+                
+                {% if error %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {{ error }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endif %}
+                
+                <form method="post" action="{% url 'registration-verify-otp' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="email" value="{{ email }}">
+                    
+                    <div class="mb-4">
+                        <label for="otp" class="form-label fw-bold" style="color: #374151; margin-bottom: 0.5rem;">
+                            <i class="bi bi-key me-2"></i>Verification Code
+                        </label>
+                        <input type="text" id="otp" name="otp" class="form-control text-center" 
+                               style="padding: 1rem 1.25rem; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1.5rem; font-weight: bold; letter-spacing: 0.2rem; transition: all 0.2s ease;" 
+                               placeholder="000000" maxlength="6" required autocomplete="one-time-code">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success-modern w-100 btn-lg mb-3">
+                        <i class="bi bi-check-circle me-2"></i>Complete Registration
+                    </button>
+                </form>
+                
+                <div class="text-center">
+                    <p class="text-muted mb-2">Didn't receive the code?</p>
+                    <a href="{% url 'registration' %}" class="text-primary fw-semibold text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Registration
+                    </a>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        After verification, you'll be automatically logged in to your dashboard
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control:focus {
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 0.2rem rgba(16, 185, 129, 0.25) !important;
+    }
+    
+    .bg-gradient-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+    
+    .btn-success-modern {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.85rem 1.5rem;
+        font-weight: 600;
+        letter-spacing: 0.02rem;
+        transition: all 0.3s ease;
+        color: white;
+    }
+    
+    .btn-success-modern:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        color: white;
+    }
+</style>
+{% endblock %}

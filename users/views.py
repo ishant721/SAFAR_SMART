@@ -30,7 +30,8 @@ class RegisterView(generics.CreateAPIView):
         }
         html_message = render_to_string('email/otp_email.html', context)
         plain_message = strip_tags(html_message)
-        from_email = 'ishantsingh01275@gmail.com' # Replace with your email
+        from django.conf import settings
+        from_email = settings.DEFAULT_FROM_EMAIL
         to_email = user.email
 
         send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
@@ -98,7 +99,8 @@ class ResendOTPView(generics.GenericAPIView):
         }
         html_message = render_to_string('email/otp_email.html' if otp_type == 'registration' else 'email/password_reset_otp.html', context)
         plain_message = strip_tags(html_message)
-        from_email = 'ishantsingh01275@gmail.com' # Replace with your email
+        from django.conf import settings
+        from_email = settings.DEFAULT_FROM_EMAIL
         to_email = user.email
 
         send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
@@ -136,7 +138,8 @@ def login_view(request):
                     }
                     html_message = render_to_string('email/otp_email.html', context)
                     plain_message = strip_tags(html_message)
-                    from_email = 'ishantsingh01275@gmail.com'
+                    from django.conf import settings
+                    from_email = settings.DEFAULT_FROM_EMAIL
                     to_email = user.email
                     
                     send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
@@ -180,7 +183,8 @@ class ForgotPasswordRequestView(generics.GenericAPIView):
         }
         html_message = render_to_string('email/password_reset_otp.html', context)
         plain_message = strip_tags(html_message)
-        from_email = 'ishantsingh01275@gmail.com' # Replace with your email
+        from django.conf import settings
+        from_email = settings.DEFAULT_FROM_EMAIL
         to_email = user.email
 
         send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
@@ -240,6 +244,36 @@ def forgot_password_otp_verify_view(request):
 
 def forgot_password_request_view(request):
     return render(request, 'forgot_password.html')
+
+def registration_verify_otp_view(request):
+    """Handle OTP verification after registration - logs user in directly"""
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        otp = request.POST.get('otp')
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return render(request, 'registration_verify_otp.html', {'error': 'User not found.', 'email': email})
+
+        if not user.is_otp_valid():
+            return render(request, 'registration_verify_otp.html', {'error': 'OTP has expired.', 'email': email})
+
+        if user.otp != otp:
+            return render(request, 'registration_verify_otp.html', {'error': 'Invalid OTP.', 'email': email})
+
+        # OTP is valid, activate user and log them in directly
+        user.is_active = True
+        user.otp = None  # Clear OTP after successful verification
+        user.otp_created_at = None
+        user.save()
+        
+        # Log the user in automatically after successful verification
+        login(request, user)
+        return redirect('/dashboard/')
+    else:
+        email = request.GET.get('email')
+        return render(request, 'registration_verify_otp.html', {'email': email})
 
 def login_verify_otp_view(request):
     """Handle OTP verification during login for unverified users"""
