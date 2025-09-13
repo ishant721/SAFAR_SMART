@@ -62,6 +62,69 @@
             {% endif %}
         </div>
 
+        <div id="journey-progress" class="content-section tab-content" style="display: none;">
+            <h2 class="section-title"><i class="bi bi-check-circle"></i> Journey Progress</h2>
+            
+            <!-- Trip Progress Overview -->
+            <div class="progress-overview mb-4 p-3" style="background: linear-gradient(135deg, #8B4513, #A0522D); color: white; border-radius: 10px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">📊 Trip Progress</h5>
+                        <p class="mb-0" id="progressSummary">0 of 0 checkpoints completed (0.0%)</p>
+                    </div>
+                    <div class="text-end">
+                        <div class="d-flex gap-2 mb-2">
+                            <span class="badge bg-light text-dark" id="totalBadge">0 Total Stops</span>
+                            <span class="badge bg-success" id="completedBadge">0 Completed</span>
+                            <span class="badge bg-warning" id="remainingBadge">0 Remaining</span>
+                        </div>
+                        <div class="progress" style="height: 8px; background: rgba(255,255,255,0.3);">
+                            <div class="progress-bar bg-success" id="mainProgressBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 mb-4">
+                <button class="btn btn-success" id="startJourneyBtn" onclick="startJourney()">
+                    ▶️ Start Journey
+                </button>
+                <button class="btn btn-warning" onclick="switchToSection('chat')">
+                    🤖 Travel Assistant
+                </button>
+                <a href="{% url 'download_trip_pdf' trip.id %}" class="btn btn-primary">
+                    📄 Download PDF
+                </a>
+                <button class="btn btn-secondary" onclick="switchToSection('itinerary')">
+                    ← Back
+                </button>
+            </div>
+
+            <!-- Journey Timeline -->
+            <div id="journeyTimeline">
+                <!-- Days and checkpoints will be dynamically loaded here -->
+                <div id="timelineContainer"></div>
+                
+                <div class="text-center mt-4" id="loadJourneySection">
+                    {% if trip.complete_trip_plan %}
+                        <button class="btn btn-primary-modern" onclick="loadJourneyCheckpoints()">
+                            🗺️ Load Journey Checkpoints
+                        </button>
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="bi bi-map"></i>
+                            <h5>No trip plan available</h5>
+                            <p>Please generate a complete trip plan first to start tracking your journey.</p>
+                            <button class="btn btn-primary-modern" onclick="processTrip('complete_trip_plan', {{ trip.id }})">
+                                Generate Trip Plan
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div id="activities" class="content-section tab-content" style="display: none;">
             <h2 class="section-title"><i class="bi bi-calendar-event"></i> Activity Suggestions</h2>
             {% if trip.activity_suggestions %}
@@ -281,9 +344,163 @@
 
 {% endblock %}
 
+{% block extra_css %}
+<style>
+.journey-day {
+    background: linear-gradient(135deg, #8B4513, #A0522D);
+    color: white;
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    border-radius: 10px;
+    position: relative;
+}
+
+.day-progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.day-progress-fill {
+    height: 100%;
+    background: #28a745;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.checkpoint-item {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    margin: 1rem 0;
+    padding: 1.5rem;
+    position: relative;
+    transition: all 0.3s ease;
+    border-left: 4px solid #8B4513;
+}
+
+.checkpoint-item.completed {
+    background: #d4edda;
+    border-color: #28a745;
+    border-left-color: #28a745;
+}
+
+.checkpoint-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.checkpoint-time {
+    display: inline-flex;
+    align-items: center;
+    background: #8B4513;
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.checkpoint-location {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #8B4513;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.checkpoint-description {
+    color: #6c757d;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.checkpoint-tip {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.experience-notes {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 0.75rem;
+    width: 100%;
+    min-height: 80px;
+    margin-bottom: 1rem;
+    resize: vertical;
+}
+
+.checkpoint-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.complete-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.complete-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.complete-btn.completed {
+    background: #6c757d;
+    cursor: default;
+}
+
+.timeline-connector {
+    position: absolute;
+    left: 2rem;
+    top: 0;
+    bottom: -1rem;
+    width: 2px;
+    background: #8B4513;
+    opacity: 0.3;
+}
+
+.timeline-connector.last {
+    display: none;
+}
+
+.journey-started {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+</style>
+{% endblock %}
+
 {% block extra_js %}
 <script>
 const logoUrl = "{% static 'images/logo.png' %}";
+let journeyCheckpoints = [];
+let completedCheckpoints = new Set();
+let journeyStarted = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     const sidebarLinks = document.querySelectorAll('.sidebar-link');
@@ -303,11 +520,362 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById(targetId).style.display = 'block';
         });
     });
+
+    // Load saved progress
+    loadSavedProgress();
 });
 
+// Journey Progress Functions
+function loadJourneyCheckpoints() {
+    const tripPlan = `{{ trip.complete_trip_plan|escapejs }}`;
+    const itinerary = `{{ trip.itinerary|escapejs }}`;
+    
+    if (!tripPlan && !itinerary) {
+        showNotification('No trip plan available to parse checkpoints.', 'warning');
+        return;
+    }
+    
+    // Parse checkpoints from the trip plan
+    journeyCheckpoints = parseCheckpointsFromText(tripPlan || itinerary);
+    
+    if (journeyCheckpoints.length === 0) {
+        showNotification('No checkpoints found in the trip plan.', 'warning');
+        return;
+    }
+    
+    // Render the timeline
+    renderJourneyTimeline();
+    updateProgressDisplay();
+    
+    // Hide the load button
+    document.getElementById('loadJourneySection').style.display = 'none';
+    
+    showNotification(`Loaded ${journeyCheckpoints.length} checkpoints from your trip plan!`, 'success');
+}
+
+function parseCheckpointsFromText(text) {
+    const checkpoints = [];
+    const days = {};
+    
+    // Split text into lines for processing
+    const lines = text.split('\n');
+    let currentDay = 1;
+    let dayCheckpointCount = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Detect day headers
+        const dayMatch = line.match(/Day\s*(\d+)/i);
+        if (dayMatch) {
+            currentDay = parseInt(dayMatch[1]);
+            dayCheckpointCount = 0;
+            if (!days[currentDay]) {
+                days[currentDay] = [];
+            }
+            continue;
+        }
+        
+        // Extract time-based activities
+        const timePatterns = [
+            // Pattern: Morning (Temple Darshan): After an early breakfast...
+            /(\w+)\s*\(([^)]+)\):\s*(.+)/,
+            // Pattern: 09:00 - Visit something
+            /(\d{1,2}):(\d{2})\s*[-:]?\s*(.+)/,
+            // Pattern: Morning: Visit something
+            /(\w+):\s*(.+)/,
+            // Pattern: • Morning (Temple Darshan): Description
+            /•\s*(\w+)\s*\(([^)]+)\):\s*(.+)/,
+            // Pattern: • Visit/Explore something
+            /•\s*(Visit|Explore|Go to|Head to)\s+(.+?)[:.]?\s*(.+)/i
+        ];
+        
+        for (const pattern of timePatterns) {
+            const match = line.match(pattern);
+            if (match) {
+                let time = '';
+                let location = '';
+                let description = '';
+                let tip = '';
+                
+                if (pattern === timePatterns[0]) { // Morning (Temple Darshan): Description
+                    time = match[1];
+                    location = match[2];
+                    description = match[3];
+                } else if (pattern === timePatterns[1]) { // 09:00 - Activity
+                    time = `${match[1]}:${match[2]}`;
+                    location = match[3].split('.')[0];
+                    description = match[3];
+                } else if (pattern === timePatterns[2]) { // Morning: Activity
+                    time = match[1];
+                    location = match[2].split('.')[0];
+                    description = match[2];
+                } else if (pattern === timePatterns[3]) { // • Morning (Temple Darshan): Description
+                    time = match[1];
+                    location = match[2];
+                    description = match[3];
+                } else if (pattern === timePatterns[4]) { // • Visit something
+                    time = match[1];
+                    location = match[2];
+                    description = match[3] || match[2];
+                }
+                
+                // Look for tips in the next few lines
+                for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+                    const nextLine = lines[j].trim();
+                    if (nextLine && !nextLine.match(/Day\s*\d+/i) && !nextLine.match(/\d{1,2}:\d{2}/)) {
+                        if (nextLine.toLowerCase().includes('tip') || 
+                            nextLine.toLowerCase().includes('avoid') ||
+                            nextLine.toLowerCase().includes('reach early') ||
+                            nextLine.toLowerCase().includes('take the')) {
+                            tip = nextLine;
+                            break;
+                        }
+                    }
+                }
+                
+                if (location.length > 3 && location.length < 100) {
+                    const checkpoint = {
+                        id: checkpoints.length,
+                        day: currentDay,
+                        time: time,
+                        location: location.trim(),
+                        description: description.trim(),
+                        tip: tip.trim(),
+                        completed: false,
+                        notes: ''
+                    };
+                    
+                    checkpoints.push(checkpoint);
+                    days[currentDay] = days[currentDay] || [];
+                    days[currentDay].push(checkpoint);
+                    dayCheckpointCount++;
+                }
+                break;
+            }
+        }
+    }
+    
+    return checkpoints;
+}
+
+function renderJourneyTimeline() {
+    const container = document.getElementById('timelineContainer');
+    
+    // Group checkpoints by day
+    const dayGroups = {};
+    journeyCheckpoints.forEach(checkpoint => {
+        if (!dayGroups[checkpoint.day]) {
+            dayGroups[checkpoint.day] = [];
+        }
+        dayGroups[checkpoint.day].push(checkpoint);
+    });
+    
+    let timelineHTML = '';
+    
+    Object.keys(dayGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(day => {
+        const dayCheckpoints = dayGroups[day];
+        const completedCount = dayCheckpoints.filter(c => completedCheckpoints.has(c.id)).length;
+        const totalCount = dayCheckpoints.length;
+        const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        
+        timelineHTML += `
+            <div class="journey-day">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-1">🌍 Day ${day}</h4>
+                    <span class="badge bg-light text-dark">${completedCount}/${totalCount} completed</span>
+                </div>
+                <div class="day-progress-bar">
+                    <div class="day-progress-fill" style="width: ${progressPercent}%"></div>
+                </div>
+            </div>
+        `;
+        
+        dayCheckpoints.forEach((checkpoint, index) => {
+            const isCompleted = completedCheckpoints.has(checkpoint.id);
+            const isLast = index === dayCheckpoints.length - 1;
+            
+            timelineHTML += `
+                <div class="checkpoint-item ${isCompleted ? 'completed' : ''}" id="checkpoint-${checkpoint.id}">
+                    <div class="checkpoint-time">
+                        🕐 ${checkpoint.time}
+                    </div>
+                    
+                    <div class="checkpoint-location">
+                        📍 ${checkpoint.location}
+                    </div>
+                    
+                    <div class="checkpoint-description">
+                        ${checkpoint.description}
+                    </div>
+                    
+                    ${checkpoint.tip ? `
+                        <div class="checkpoint-tip">
+                            💡 ${checkpoint.tip}
+                        </div>
+                    ` : ''}
+                    
+                    <textarea 
+                        class="experience-notes" 
+                        placeholder="Add your experience notes..."
+                        onchange="saveCheckpointNotes(${checkpoint.id}, this.value)"
+                        ${isCompleted ? '' : 'style="display: none;"'}
+                    >${checkpoint.notes}</textarea>
+                    
+                    <div class="checkpoint-actions">
+                        <div></div>
+                        <button 
+                            class="complete-btn ${isCompleted ? 'completed' : ''}" 
+                            onclick="toggleCheckpointCompletion(${checkpoint.id})"
+                            ${isCompleted ? 'disabled' : ''}
+                        >
+                            ${isCompleted ? '✅ Completed' : '✓ Complete'}
+                        </button>
+                    </div>
+                    
+                    ${!isLast ? '<div class="timeline-connector"></div>' : ''}
+                </div>
+            `;
+        });
+    });
+    
+    container.innerHTML = timelineHTML;
+}
+
+function startJourney() {
+    if (journeyCheckpoints.length === 0) {
+        showNotification('Please load journey checkpoints first!', 'warning');
+        return;
+    }
+    
+    journeyStarted = true;
+    saveProgressToLocalStorage();
+    
+    document.getElementById('startJourneyBtn').innerHTML = '🎯 Journey Started';
+    document.getElementById('startJourneyBtn').classList.add('journey-started');
+    document.getElementById('startJourneyBtn').disabled = true;
+    
+    showNotification('🎉 Journey started! Begin exploring your checkpoints.', 'success');
+}
+
+function toggleCheckpointCompletion(checkpointId) {
+    if (!journeyStarted) {
+        showNotification('Please start your journey first!', 'warning');
+        return;
+    }
+    
+    const checkpoint = journeyCheckpoints.find(c => c.id === checkpointId);
+    if (!checkpoint) return;
+    
+    completedCheckpoints.add(checkpointId);
+    checkpoint.completed = true;
+    
+    const element = document.getElementById(`checkpoint-${checkpointId}`);
+    element.classList.add('completed');
+    
+    const button = element.querySelector('.complete-btn');
+    button.innerHTML = '✅ Completed';
+    button.classList.add('completed');
+    button.disabled = true;
+    
+    const textarea = element.querySelector('.experience-notes');
+    textarea.style.display = 'block';
+    
+    updateProgressDisplay();
+    saveProgressToLocalStorage();
+    
+    showNotification(`✅ Completed "${checkpoint.location}"!`, 'success');
+}
+
+function saveCheckpointNotes(checkpointId, notes) {
+    const checkpoint = journeyCheckpoints.find(c => c.id === checkpointId);
+    if (checkpoint) {
+        checkpoint.notes = notes;
+        saveProgressToLocalStorage();
+        if (notes.trim()) {
+            showNotification('Notes saved!', 'success');
+        }
+    }
+}
+
+function updateProgressDisplay() {
+    const total = journeyCheckpoints.length;
+    const completed = completedCheckpoints.size;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    document.getElementById('progressSummary').textContent = 
+        `${completed} of ${total} checkpoints completed (${percentage}%)`;
+    document.getElementById('totalBadge').textContent = `${total} Total Stops`;
+    document.getElementById('completedBadge').textContent = `${completed} Completed`;
+    document.getElementById('remainingBadge').textContent = `${total - completed} Remaining`;
+    document.getElementById('mainProgressBar').style.width = `${percentage}%`;
+    
+    // Re-render timeline to update day progress
+    if (journeyCheckpoints.length > 0) {
+        renderJourneyTimeline();
+    }
+}
+
+function saveProgressToLocalStorage() {
+    const progressData = {
+        tripId: {{ trip.id }},
+        journeyStarted: journeyStarted,
+        completedCheckpoints: Array.from(completedCheckpoints),
+        checkpointNotes: journeyCheckpoints.reduce((acc, checkpoint) => {
+            if (checkpoint.notes) {
+                acc[checkpoint.id] = checkpoint.notes;
+            }
+            return acc;
+        }, {}),
+        timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('journeyProgress_{{ trip.id }}', JSON.stringify(progressData));
+}
+
+function loadSavedProgress() {
+    const savedProgress = localStorage.getItem('journeyProgress_{{ trip.id }}');
+    if (savedProgress) {
+        try {
+            const data = JSON.parse(savedProgress);
+            journeyStarted = data.journeyStarted || false;
+            completedCheckpoints = new Set(data.completedCheckpoints || []);
+            
+            if (journeyStarted) {
+                document.getElementById('startJourneyBtn').innerHTML = '🎯 Journey Started';
+                document.getElementById('startJourneyBtn').classList.add('journey-started');
+                document.getElementById('startJourneyBtn').disabled = true;
+            }
+            
+            // Apply saved notes to checkpoints
+            if (data.checkpointNotes) {
+                Object.keys(data.checkpointNotes).forEach(checkpointId => {
+                    const checkpoint = journeyCheckpoints.find(c => c.id === parseInt(checkpointId));
+                    if (checkpoint) {
+                        checkpoint.notes = data.checkpointNotes[checkpointId];
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error loading saved progress:', e);
+        }
+    }
+}
+
+function switchToSection(sectionId) {
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    sidebarLinks.forEach(l => l.classList.remove('active'));
+    tabContents.forEach(t => t.style.display = 'none');
+    
+    const targetLink = document.querySelector(`[data-target="${sectionId}"]`);
+    const targetSection = document.getElementById(sectionId);
+    
+    if (targetLink) targetLink.classList.add('active');
+    if (targetSection) targetSection.style.display = 'block';
+}
+
 function processTrip(agentName, tripId) {
-    // This function might need to be adapted if you want to show a loading state
-    // inside the tab content instead of a full-page overlay.
     showLoading(`Generating ${agentName.replace('_', ' ')}...`);
     
     fetch(`/planner/process_trip/${tripId}/`, {
@@ -326,7 +894,7 @@ function processTrip(agentName, tripId) {
             if (data.warning) {
                 showNotification('Warning: ' + data.warning, 'warning');
             }
-            setTimeout(() => location.reload(), 1000); // Reload to see the new content
+            setTimeout(() => location.reload(), 1000);
         } else {
             showNotification('Error: ' + data.message, 'error');
         }
