@@ -117,7 +117,25 @@ def login_view(request):
                     login(request, user)
                     return redirect('/dashboard/')
                 else:
-                    form.add_error(None, "Your account is inactive. Please activate your account.")
+                    # User is registered but not verified - redirect to verification
+                    request.session['verification_email'] = email
+                    # Send new OTP for login verification
+                    user.generate_new_otp(otp_type='registration')
+                    
+                    # Send OTP email
+                    subject = 'Your OTP for Login Verification'
+                    context = {
+                        'username': user.username,
+                        'otp': user.otp
+                    }
+                    html_message = render_to_string('email/otp_email.html', context)
+                    plain_message = strip_tags(html_message)
+                    from_email = 'ishantsingh01275@gmail.com'
+                    to_email = user.email
+                    
+                    send_mail(subject, plain_message, from_email, [to_email], html_message=html_message)
+                    
+                    return redirect('login-verify-otp')
             else:
                 form.add_error(None, "Invalid email or password.")
     else:
@@ -211,6 +229,44 @@ def forgot_password_otp_verify_view(request):
 
 def forgot_password_request_view(request):
     return render(request, 'forgot_password.html')
+
+def login_verify_otp_view(request):
+    """Handle OTP verification during login for unverified users"""
+    if request.method == 'POST':
+        email = request.session.get('verification_email')
+        otp = request.POST.get('otp')
+        
+        if not email:
+            return render(request, 'login_verify_otp.html', {'error': 'Session expired. Please try logging in again.'})
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return render(request, 'login_verify_otp.html', {'error': 'User not found.', 'email': email})
+
+        if not user.is_otp_valid():
+            return render(request, 'login_verify_otp.html', {'error': 'OTP has expired. Please try logging in again.', 'email': email})
+
+        if user.otp != otp:
+            return render(request, 'login_verify_otp.html', {'error': 'Invalid OTP.', 'email': email})
+
+        # OTP is valid, activate user and log them in
+        user.is_active = True
+        user.otp = None  # Clear OTP after successful verification
+        user.otp_created_at = None
+        user.save()
+        
+        # Clear verification session
+        del request.session['verification_email']
+        
+        # Log the user in automatically
+        login(request, user)
+        return redirect('/dashboard/')
+    else:
+        email = request.session.get('verification_email')
+        if not email:
+            return redirect('login')
+        return render(request, 'login_verify_otp.html', {'email': email})
 
 @login_required
 def profile_view(request):

@@ -24,6 +24,7 @@ class User(AbstractUser):
         if not self.pk:
             self.otp = generate_otp()
             self.otp_created_at = timezone.now()
+            self.is_active = False  # New users are inactive until OTP verification
         super().save(*args, **kwargs)
 
     def is_otp_valid(self):

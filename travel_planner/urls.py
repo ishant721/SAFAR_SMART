@@ -23,7 +23,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from users.views import login_view, interactive_register_view, forgot_password_request_view, forgot_password_confirm_view, forgot_password_otp_verify_view
+from users.views import login_view, interactive_register_view, forgot_password_request_view, forgot_password_confirm_view, forgot_password_otp_verify_view, login_verify_otp_view
 from planner.views import dashboard
 
 urlpatterns = [
@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('login/', login_view, name='login'),
+    path('login-verify-otp/', login_verify_otp_view, name='login-verify-otp'),
     path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),
     path('registration/', interactive_register_view, name='registration'),
     path('dashboard/', dashboard, name='dashboard'),
