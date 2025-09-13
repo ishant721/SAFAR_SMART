@@ -3,7 +3,7 @@ import traceback
 from django.contrib.auth.decorators import login_required
 from .models import Trip, ChatMessage
 from .forms import TripForm
-from .langgraph_logic import graph, generate_itinerary, recommend_activities_agent, fetch_useful_links_agent, weather_forecaster_agent, packing_list_generator_agent, food_culture_recommender_agent, chat_agent, accommodation_recommender_agent, expense_breakdown_agent, complete_trip_plan_agent
+from .langgraph_logic import graph, generate_itinerary, recommend_activities_agent, fetch_useful_links_agent, weather_forecaster_agent, packing_list_generator_agent, food_culture_recommender_agent, chat_agent, accommodation_recommender_agent, expense_breakdown_agent, complete_trip_plan_agent, generate_complete_trip_automatically
 from django.http import JsonResponse, HttpResponse
 import json
 from django.urls import reverse # Added import
@@ -125,6 +125,7 @@ def process_trip(request, trip_id):
         # Map agent names to their functions
         agent_functions = {
             "generate_itinerary": generate_itinerary,
+            "generate_complete_trip": generate_complete_trip_automatically,
             "recommend_activities": recommend_activities_agent,
             "fetch_useful_links": fetch_useful_links_agent,
             "weather_forecaster": weather_forecaster_agent,
@@ -183,6 +184,9 @@ def process_trip(request, trip_id):
             # Add warning if present in agent's result
             if isinstance(result, dict) and "warning" in result:
                 response_data["warning"] = result["warning"]
+            # Handle warnings (plural) from comprehensive generation
+            if isinstance(result, dict) and "warnings" in result:
+                response_data["warnings"] = result["warnings"]
             return JsonResponse(response_data)
         except Exception as e:
             print(f"Error in process_trip: {e}")
