@@ -293,5 +293,5 @@ def download_trip_pdf(request, trip_id):
     
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="trip_{trip.destination}_{trip.id}.pdf"'
-    response.write(pdf.output(dest='S').encode('latin-1'))
+    response.write(pdf.output(dest='S'))
     return response

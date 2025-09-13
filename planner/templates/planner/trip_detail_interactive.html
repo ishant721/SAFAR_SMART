@@ -543,6 +543,9 @@ function loadJourneyCheckpoints() {
         return;
     }
     
+    // Apply any saved notes to the checkpoints
+    applySavedNotesToCheckpoints();
+    
     // Render the timeline
     renderJourneyTimeline();
     updateProgressDisplay();
@@ -555,108 +558,140 @@ function loadJourneyCheckpoints() {
 
 function parseCheckpointsFromText(text) {
     const checkpoints = [];
-    const days = {};
     
-    // Split text into lines for processing
-    const lines = text.split('\n');
+    // Strip HTML tags and decode HTML entities for proper text parsing
+    const cleanText = text.replace(/<[^>]*>/g, '')
+                          .replace(/&nbsp;/g, ' ')
+                          .replace(/&amp;/g, '&')
+                          .replace(/&lt;/g, '<')
+                          .replace(/&gt;/g, '>')
+                          .replace(/&quot;/g, '"')
+                          .replace(/&#x27;/g, "'")
+                          .replace(/\r\n/g, '\n')
+                          .replace(/\r/g, '\n');
+    
+    const lines = cleanText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     let currentDay = 1;
-    let dayCheckpointCount = 0;
     
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = lines[i];
         
         // Detect day headers
         const dayMatch = line.match(/Day\s*(\d+)/i);
         if (dayMatch) {
             currentDay = parseInt(dayMatch[1]);
-            dayCheckpointCount = 0;
-            if (!days[currentDay]) {
-                days[currentDay] = [];
-            }
             continue;
         }
         
-        // Extract time-based activities
-        const timePatterns = [
-            // Pattern: Morning (Temple Darshan): After an early breakfast...
-            /(\w+)\s*\(([^)]+)\):\s*(.+)/,
-            // Pattern: 09:00 - Visit something
-            /(\d{1,2}):(\d{2})\s*[-:]?\s*(.+)/,
-            // Pattern: Morning: Visit something
-            /(\w+):\s*(.+)/,
-            // Pattern: • Morning (Temple Darshan): Description
-            /•\s*(\w+)\s*\(([^)]+)\):\s*(.+)/,
-            // Pattern: • Visit/Explore something
-            /•\s*(Visit|Explore|Go to|Head to)\s+(.+?)[:.]?\s*(.+)/i
-        ];
+        // Pattern matching for different checkpoint formats
+        let checkpoint = null;
         
-        for (const pattern of timePatterns) {
-            const match = line.match(pattern);
-            if (match) {
-                let time = '';
-                let location = '';
-                let description = '';
-                let tip = '';
-                
-                if (pattern === timePatterns[0]) { // Morning (Temple Darshan): Description
-                    time = match[1];
-                    location = match[2];
-                    description = match[3];
-                } else if (pattern === timePatterns[1]) { // 09:00 - Activity
-                    time = `${match[1]}:${match[2]}`;
-                    location = match[3].split('.')[0];
-                    description = match[3];
-                } else if (pattern === timePatterns[2]) { // Morning: Activity
-                    time = match[1];
-                    location = match[2].split('.')[0];
-                    description = match[2];
-                } else if (pattern === timePatterns[3]) { // • Morning (Temple Darshan): Description
-                    time = match[1];
-                    location = match[2];
-                    description = match[3];
-                } else if (pattern === timePatterns[4]) { // • Visit something
-                    time = match[1];
-                    location = match[2];
-                    description = match[3] || match[2];
-                }
-                
-                // Look for tips in the next few lines
-                for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
-                    const nextLine = lines[j].trim();
-                    if (nextLine && !nextLine.match(/Day\s*\d+/i) && !nextLine.match(/\d{1,2}:\d{2}/)) {
-                        if (nextLine.toLowerCase().includes('tip') || 
-                            nextLine.toLowerCase().includes('avoid') ||
-                            nextLine.toLowerCase().includes('reach early') ||
-                            nextLine.toLowerCase().includes('take the')) {
-                            tip = nextLine;
-                            break;
-                        }
-                    }
-                }
-                
-                if (location.length > 3 && location.length < 100) {
-                    const checkpoint = {
-                        id: checkpoints.length,
-                        day: currentDay,
-                        time: time,
-                        location: location.trim(),
-                        description: description.trim(),
-                        tip: tip.trim(),
-                        completed: false,
-                        notes: ''
-                    };
-                    
-                    checkpoints.push(checkpoint);
-                    days[currentDay] = days[currentDay] || [];
-                    days[currentDay].push(checkpoint);
-                    dayCheckpointCount++;
-                }
-                break;
+        // Pattern 1: Morning (Temple Darshan): Description
+        const pattern1 = line.match(/^(\w+)\s*\(([^)]+)\):\s*(.+)/);
+        if (pattern1) {
+            checkpoint = createCheckpoint(
+                checkpoints.length,
+                currentDay,
+                pattern1[1], // time (Morning, Afternoon, etc)
+                pattern1[2], // location (Temple Darshan)
+                pattern1[3], // description
+                lines, i
+            );
+        }
+        
+        // Pattern 2: 09:00 - Activity
+        const pattern2 = line.match(/^(\d{1,2}):(\d{2})\s*[-:]\s*(.+)/);
+        if (pattern2) {
+            const timeStr = `${pattern2[1]}:${pattern2[2]}`;
+            const activity = pattern2[3];
+            checkpoint = createCheckpoint(
+                checkpoints.length,
+                currentDay,
+                timeStr,
+                activity.split('.')[0].trim(),
+                activity,
+                lines, i
+            );
+        }
+        
+        // Pattern 3: • Morning (Temple Darshan): Description  
+        const pattern3 = line.match(/^•\s*(\w+)\s*\(([^)]+)\):\s*(.+)/);
+        if (pattern3) {
+            checkpoint = createCheckpoint(
+                checkpoints.length,
+                currentDay,
+                pattern3[1],
+                pattern3[2],
+                pattern3[3],
+                lines, i
+            );
+        }
+        
+        // Pattern 4: Simple time format like "Morning: Activity"
+        const pattern4 = line.match(/^(\w+):\s*(.+)/);
+        if (pattern4 && !pattern1 && !pattern2 && !pattern3) {
+            const timeStr = pattern4[1];
+            const activity = pattern4[2];
+            if (timeStr.match(/morning|afternoon|evening|night/i) || timeStr.match(/\d{1,2}:\d{2}/)) {
+                checkpoint = createCheckpoint(
+                    checkpoints.length,
+                    currentDay,
+                    timeStr,
+                    activity.split('.')[0].trim(),
+                    activity,
+                    lines, i
+                );
             }
+        }
+        
+        if (checkpoint) {
+            checkpoints.push(checkpoint);
         }
     }
     
     return checkpoints;
+}
+
+function createCheckpoint(id, day, time, location, description, lines, currentIndex) {
+    // Clean up location and description
+    location = location.replace(/^(visit|explore|go to|head to)\s*/i, '').trim();
+    description = description.trim();
+    
+    // Look for tips in the next few lines
+    let tip = '';
+    for (let j = currentIndex + 1; j < Math.min(currentIndex + 3, lines.length); j++) {
+        const nextLine = lines[j];
+        if (nextLine && 
+            !nextLine.match(/Day\s*\d+/i) && 
+            !nextLine.match(/\d{1,2}:\d{2}/) &&
+            !nextLine.match(/^(\w+):\s*(.+)/) &&
+            (nextLine.toLowerCase().includes('tip') || 
+             nextLine.toLowerCase().includes('avoid') ||
+             nextLine.toLowerCase().includes('reach early') ||
+             nextLine.toLowerCase().includes('take the') ||
+             nextLine.toLowerCase().includes('recommend'))) {
+            tip = nextLine;
+            break;
+        }
+    }
+    
+    // Only create checkpoint if location is meaningful
+    if (location.length > 2 && location.length < 100 && 
+        !location.match(/^\d+$/) && 
+        !location.match(/^(a|an|the|and|or|but|for|at|in|on|to)$/i)) {
+        return {
+            id: id,
+            day: day,
+            time: time,
+            location: location,
+            description: description,
+            tip: tip,
+            completed: false,
+            notes: ''
+        };
+    }
+    
+    return null;
 }
 
 function renderJourneyTimeline() {
@@ -803,15 +838,32 @@ function updateProgressDisplay() {
     const completed = completedCheckpoints.size;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     
-    document.getElementById('progressSummary').textContent = 
-        `${completed} of ${total} checkpoints completed (${percentage}%)`;
-    document.getElementById('totalBadge').textContent = `${total} Total Stops`;
-    document.getElementById('completedBadge').textContent = `${completed} Completed`;
-    document.getElementById('remainingBadge').textContent = `${total - completed} Remaining`;
-    document.getElementById('mainProgressBar').style.width = `${percentage}%`;
+    const progressSummaryEl = document.getElementById('progressSummary');
+    const totalBadgeEl = document.getElementById('totalBadge');
+    const completedBadgeEl = document.getElementById('completedBadge');
+    const remainingBadgeEl = document.getElementById('remainingBadge');
+    const mainProgressBarEl = document.getElementById('mainProgressBar');
     
-    // Re-render timeline to update day progress
-    if (journeyCheckpoints.length > 0) {
+    if (progressSummaryEl) {
+        progressSummaryEl.textContent = `${completed} of ${total} checkpoints completed (${percentage}%)`;
+    }
+    if (totalBadgeEl) {
+        totalBadgeEl.textContent = `${total} Total Stops`;
+    }
+    if (completedBadgeEl) {
+        completedBadgeEl.textContent = `${completed} Completed`;
+    }
+    if (remainingBadgeEl) {
+        remainingBadgeEl.textContent = `${total - completed} Remaining`;
+    }
+    if (mainProgressBarEl) {
+        mainProgressBarEl.style.width = `${percentage}%`;
+    }
+    
+    // Re-render timeline to update day progress if we're in the journey section
+    const currentSection = document.querySelector('.content-section[style*="block"]') || 
+                          document.querySelector('.content-section.active');
+    if (currentSection && currentSection.id === 'journey-progress' && journeyCheckpoints.length > 0) {
         renderJourneyTimeline();
     }
 }
@@ -840,24 +892,32 @@ function loadSavedProgress() {
             journeyStarted = data.journeyStarted || false;
             completedCheckpoints = new Set(data.completedCheckpoints || []);
             
-            if (journeyStarted) {
-                document.getElementById('startJourneyBtn').innerHTML = '🎯 Journey Started';
-                document.getElementById('startJourneyBtn').classList.add('journey-started');
-                document.getElementById('startJourneyBtn').disabled = true;
+            const startJourneyBtn = document.getElementById('startJourneyBtn');
+            if (journeyStarted && startJourneyBtn) {
+                startJourneyBtn.innerHTML = '🎯 Journey Started';
+                startJourneyBtn.classList.add('journey-started');
+                startJourneyBtn.disabled = true;
             }
             
-            // Apply saved notes to checkpoints
-            if (data.checkpointNotes) {
-                Object.keys(data.checkpointNotes).forEach(checkpointId => {
-                    const checkpoint = journeyCheckpoints.find(c => c.id === parseInt(checkpointId));
-                    if (checkpoint) {
-                        checkpoint.notes = data.checkpointNotes[checkpointId];
-                    }
-                });
-            }
+            // Apply saved notes to checkpoints - will be applied after checkpoints are loaded
+            window.savedCheckpointNotes = data.checkpointNotes || {};
+            
+            console.log('Loaded progress:', { journeyStarted, completedCount: completedCheckpoints.size });
         } catch (e) {
             console.error('Error loading saved progress:', e);
         }
+    }
+}
+
+function applySavedNotesToCheckpoints() {
+    if (window.savedCheckpointNotes && journeyCheckpoints.length > 0) {
+        Object.keys(window.savedCheckpointNotes).forEach(checkpointId => {
+            const checkpoint = journeyCheckpoints.find(c => c.id === parseInt(checkpointId));
+            if (checkpoint) {
+                checkpoint.notes = window.savedCheckpointNotes[checkpointId];
+            }
+        });
+        delete window.savedCheckpointNotes; // Clean up
     }
 }
 
