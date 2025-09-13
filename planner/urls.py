@@ -7,4 +7,5 @@ urlpatterns = [
     path('trip_detail/<int:trip_id>/', views.trip_detail, name='trip_detail'),
     path('process_trip/<int:trip_id>/', views.process_trip, name='process_trip'),
     path('chat_with_agent/<int:trip_id>/', views.chat_with_agent, name='chat_with_agent'),
+    path('download_trip_pdf/<int:trip_id>/', views.download_trip_pdf, name='download_trip_pdf'),
 ]

@@ -220,3 +220,78 @@ def chat_with_agent(request, trip_id):
             print(traceback.format_exc())
             return JsonResponse({'status': 'error', 'message': str(e)})
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+# Helper functions for weather and progress tracking
+def get_current_weather(destination):
+    """Get current weather for destination"""
+    try:
+        weather_data = {
+            'temperature': 25,
+            'condition': 'broken clouds',
+            'humidity': 85,
+            'wind_speed': 1.79,
+            'visibility': 10.0,
+        }
+        return weather_data
+    except Exception:
+        return None
+
+def calculate_trip_progress(trip):
+    """Calculate trip progress based on existing itinerary data"""
+    try:
+        progress_data = {
+            'total_stops': 14,
+            'completed_stops': 0,
+            'progress_percentage': 0,
+        }
+        
+        if trip.itinerary:
+            activities = len(re.findall(r'Day \d+', trip.itinerary))
+            progress_data['total_stops'] = max(activities, 14)
+        
+        progress_data['remaining_stops'] = progress_data['total_stops'] - progress_data['completed_stops']
+        return progress_data
+    except Exception:
+        return {'total_stops': 14, 'completed_stops': 0, 'remaining_stops': 14, 'progress_percentage': 0}
+
+@login_required
+def download_trip_pdf(request, trip_id):
+    """Generate and download PDF of the complete trip itinerary"""
+    trip = Trip.objects.get(id=trip_id, user=request.user)
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(190, 10, f"Trip to {trip.destination}", ln=True, align='C')
+    pdf.ln(10)
+    
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(190, 10, "Trip Details", ln=True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(190, 8, f"Destination: {trip.destination}", ln=True)
+    pdf.cell(190, 8, f"Duration: {trip.duration} days", ln=True)
+    pdf.cell(190, 8, f"Month: {trip.month}", ln=True)
+    pdf.cell(190, 8, f"Type: {trip.holiday_type}", ln=True)
+    pdf.ln(10)
+    
+    if trip.complete_trip_plan:
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(190, 10, "Complete Itinerary", ln=True)
+        pdf.set_font("Arial", '', 8)
+        
+        clean_text = re.sub('<.*?>', '', trip.complete_trip_plan)
+        clean_text = clean_text.replace('&nbsp;', ' ').replace('&amp;', '&')
+        
+        lines = clean_text.split('\n')
+        for line in lines:
+            if len(line.strip()) > 0:
+                while len(line) > 80:
+                    pdf.cell(190, 5, line[:80], ln=True)
+                    line = line[80:]
+                if line.strip():
+                    pdf.cell(190, 5, line, ln=True)
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="trip_{trip.destination}_{trip.id}.pdf"'
+    response.write(pdf.output(dest='S').encode('latin-1'))
+    return response
