@@ -2,6 +2,7 @@ modules = ["web", "nodejs-20", "python-3.12"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["bash"]
 
 [agent]
 expertMode = true
