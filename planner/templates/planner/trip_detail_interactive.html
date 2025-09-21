@@ -15,7 +15,8 @@
             {% endif %}
         </div>
         <div class="col-lg-4 text-lg-end">
-            <a href="{% url 'dashboard' %}" class="btn btn-light btn-lg">
+            
+            <a href="{% url 'planner:dashboard' %}" class="btn btn-light btn-lg">
                 <i class="bi bi-arrow-left"></i> Back to Dashboard
             </a>
         </div>
@@ -39,7 +40,7 @@
                 <li><a href="#food" class="sidebar-link" data-target="food"><i class="bi bi-cup-hot me-2"></i>Food & Culture</a></li>
                 <li><a href="#accommodation" class="sidebar-link" data-target="accommodation"><i class="bi bi-house me-2"></i>Accommodation</a></li>
                 <li><a href="#expenses" class="sidebar-link" data-target="expenses"><i class="bi bi-currency-dollar me-2"></i>Expenses</a></li>
-                <li><a href="#complete-plan" class="sidebar-link" data-target="complete-plan"><i class="bi bi-journal-check me-2"></i>Complete Plan</a></li>
+                
                 <li><a href="#links" class="sidebar-link" data-target="links"><i class="bi bi-link-45deg me-2"></i>Useful Links</a></li>
                 <li><a href="#chat" class="sidebar-link" data-target="chat"><i class="bi bi-robot me-2"></i>AI Assistant</a></li>
             </ul>
@@ -60,7 +61,6 @@
                     <button class="btn btn-primary-modern btn-lg" onclick="generateCompleteTrip({{ trip.id }})">
                         ✨ Generate Complete Trip Plan
                     </button>
-                    <p class="text-muted mt-2">This will create your full trip plan with all details automatically</p>
                 </div>
             {% endif %}
         </div>
@@ -73,16 +73,16 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="mb-1">📊 Trip Progress</h5>
-                        <p class="mb-0" id="progressSummary">0 of 0 checkpoints completed (0.0%)</p>
+                        <p class="mb-0" id="progressSummary">{{ progress_data.completed_stops }} of {{ progress_data.total_stops }} checkpoints completed ({{ progress_data.progress_percentage }}%)</p>
                     </div>
                     <div class="text-end">
                         <div class="d-flex gap-2 mb-2">
-                            <span class="badge bg-light text-dark" id="totalBadge">0 Total Stops</span>
-                            <span class="badge bg-success" id="completedBadge">0 Completed</span>
-                            <span class="badge bg-warning" id="remainingBadge">0 Remaining</span>
+                            <span class="badge bg-light text-dark" id="totalBadge">{{ progress_data.total_stops }} Total Stops</span>
+                            <span class="badge bg-success" id="completedBadge">{{ progress_data.completed_stops }} Completed</span>
+                            <span class="badge bg-warning" id="remainingBadge">{{ progress_data.remaining_stops }} Remaining</span>
                         </div>
                         <div class="progress" style="height: 8px; background: rgba(255,255,255,0.3);">
-                            <div class="progress-bar bg-success" id="mainProgressBar" style="width: 0%"></div>
+                            <div class="progress-bar bg-success" id="mainProgressBar" style="width: {{ progress_data.progress_percentage }}%"></div>
                         </div>
                     </div>
                 </div>
@@ -90,13 +90,10 @@
 
             <!-- Action Buttons -->
             <div class="d-flex gap-2 mb-4">
-                <button class="btn btn-success" id="startJourneyBtn" onclick="startJourney()">
-                    ▶️ Start Journey
-                </button>
                 <button class="btn btn-warning" onclick="switchToSection('chat')">
                     🤖 Travel Assistant
                 </button>
-                <a href="{% url 'download_trip_pdf' trip.id %}" class="btn btn-primary">
+                <a href="{% url 'planner:download_trip_pdf' trip.id %}" class="btn btn-primary">
                     📄 Download PDF
                 </a>
                 <button class="btn btn-secondary" onclick="switchToSection('itinerary')">
@@ -106,25 +103,58 @@
 
             <!-- Journey Timeline -->
             <div id="journeyTimeline">
-                <!-- Days and checkpoints will be dynamically loaded here -->
-                <div id="timelineContainer"></div>
-                
-                <div class="text-center mt-4" id="loadJourneySection">
-                    {% if trip.complete_trip_plan %}
-                        <button class="btn btn-primary-modern" onclick="loadJourneyCheckpoints()">
-                            🗺️ Load Journey Checkpoints
-                        </button>
-                    {% else %}
-                        <div class="empty-state">
-                            <i class="bi bi-map"></i>
-                            <h5>No trip plan available</h5>
-                            <p>Generate your complete trip plan first to start tracking your journey!</p>
-                            <button class="btn btn-primary-modern" onclick="generateCompleteTrip({{ trip.id }})">
-                                ✨ Generate Complete Trip Plan
-                            </button>
+                {% if daily_checkpoints_data %}
+                    <div class="timeline-container">
+                    {% for day_data in daily_checkpoints_data %}
+                        <div class="timeline-day-container">
+                            <div class="journey-day">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h4 class="mb-1">🌍 {{ day_data.day_prefix }}</h4>
+                                    <span class="badge bg-light text-dark">{{ day_data.completed_count }}/{{ day_data.total_count }} completed</span>
+                                </div>
+                                <div class="day-progress-bar">
+                                    <div class="day-progress-fill" style="width: {{ day_data.progress_percentage|floatformat:0 }}%"></div>
+                                </div>
+                            </div>
+                            {% for checkpoint in day_data.checkpoints %}
+                                <div class="timeline-item">
+                                    <div class="timeline-dot {% if checkpoint.completed %}completed{% endif %}"></div>
+                                    <div class="timeline-content">
+                                        <div class="checkpoint-item {% if checkpoint.completed %}completed{% endif %}" id="checkpoint-{{ checkpoint.id }}">
+                                            <div class="form-check form-switch d-flex justify-content-between align-items-center mb-3">
+                                                <label class="form-check-label fs-5 fw-bold" for="checkpoint-toggle-{{ checkpoint.id }}">
+                                                    {{ checkpoint.name }}
+                                                </label>
+                                                <input class="form-check-input" type="checkbox" id="checkpoint-toggle-{{ checkpoint.id }}"
+                                                    {% if checkpoint.completed %}checked{% endif %}
+                                                    onchange="toggleCheckpointCompletion({{ checkpoint.id }})">
+                                            </div>
+
+                                            <div class="checkpoint-description mb-3">
+                                                {{ checkpoint.description|safe }}
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="feedback-text-{{ checkpoint.id }}" class="form-label">Your Experience/Feedback:</label>
+                                                <textarea class="form-control experience-notes" id="feedback-text-{{ checkpoint.id }}" rows="3"
+                                                    onblur="submitCheckpointFeedback({{ checkpoint.id }})"
+                                                    {% if not checkpoint.completed %}disabled{% endif %}
+                                                >{% if checkpoint.feedback_set.first %}{{ checkpoint.feedback_set.first.feedback }}{% endif %}</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endif %}
-                </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-map"></i>
+                        <h5>No checkpoints available</h5>
+                        <p>Generate your complete trip plan first to see your journey checkpoints!</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -270,21 +300,7 @@
             {% endif %}
         </div>
 
-        <div id="complete-plan" class="content-section tab-content" style="display: none;">
-            <h2 class="section-title"><i class="bi bi-journal-check"></i> Complete Trip Plan</h2>
-            {% if trip.complete_trip_plan %}
-                <div class="rendered-content">{{ trip.complete_trip_plan|safe }}</div>
-            {% else %}
-                <div class="empty-state">
-                    <i class="bi bi-journal-check"></i>
-                    <h5>Generate your trip plan first</h5>
-                    <p>Your complete trip plan will appear here automatically after generating the complete trip.</p>
-                    <button class="btn btn-primary-modern" onclick="generateCompleteTrip({{ trip.id }})">
-                        ✨ Generate Complete Trip Plan
-                    </button>
-                </div>
-            {% endif %}
-        </div>
+        
 
         <div id="links" class="content-section tab-content" style="display: none;">
             <h2 class="section-title"><i class="bi bi-link-45deg"></i> Useful Links</h2>
@@ -334,7 +350,7 @@
                     {% endfor %}
                 </div>
                 <div class="chat-input-container">
-                    <form id="chatForm" action="{% url 'chat_with_agent' trip.id %}" method="post">
+                    <form id="chatForm" action="{% url 'planner:chat_with_agent' trip.id %}" method="post">
                         {% csrf_token %}
                         <div class="input-group">
                             <input type="text" name="user_question" class="form-control" placeholder="Ask about your trip..." required>
@@ -351,35 +367,77 @@
 
 {% block extra_css %}
 <style>
+.timeline-container {
+    position: relative;
+    padding-left: 30px; /* Space for the timeline line and dots */
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10px; /* Position of the main timeline line */
+    width: 2px;
+    height: 100%;
+    background: #e0e0e0; /* Light gray line */
+}
+
+.timeline-day-container {
+    margin-bottom: 30px;
+    position: relative;
+}
+
+.timeline-day-container:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    padding-left: 20px; /* Space for the dot */
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-dot {
+    position: absolute;
+    top: 8px; /* Adjust to vertically center with checkpoint-item */
+    left: -6px; /* Position relative to the timeline-container's line */
+    width: 14px;
+    height: 14px;
+    background: #8B4513; /* Dot color */
+    border-radius: 50%;
+    border: 2px solid #fff; /* White border around the dot */
+    z-index: 1;
+}
+
+.timeline-dot.completed {
+    background: #28a745; /* Green for completed dots */
+}
+
+.timeline-content {
+    /* Styles for the content next to the dot */
+}
+
+/* Adjust existing styles for better integration */
 .journey-day {
     background: linear-gradient(135deg, #8B4513, #A0522D);
     color: white;
     padding: 1rem 1.5rem;
-    margin: 1rem 0;
+    margin: 1rem 0 1rem -30px; /* Adjust margin to align with timeline */
     border-radius: 10px;
     position: relative;
-}
-
-.day-progress-bar {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 0.5rem;
-}
-
-.day-progress-fill {
-    height: 100%;
-    background: #28a745;
-    border-radius: 3px;
-    transition: width 0.3s ease;
+    z-index: 1; /* Ensure it's above the timeline line */
+    width: calc(100% + 30px); /* Extend to cover the left margin */
 }
 
 .checkpoint-item {
     background: white;
     border: 1px solid #e9ecef;
     border-radius: 10px;
-    margin: 1rem 0;
+    margin: 0; /* Remove previous margin */
     padding: 1.5rem;
     position: relative;
     transition: all 0.3s ease;
@@ -503,374 +561,78 @@
 {% block extra_js %}
 <script>
 const logoUrl = "{% static 'images/logo.png' %}";
-let journeyCheckpoints = [];
-let completedCheckpoints = new Set();
-let journeyStarted = false;
 
-document.addEventListener('DOMContentLoaded', function() {
-    const sidebarLinks = document.querySelectorAll('.sidebar-link');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    sidebarLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-
-            // Deactivate all links and tabs
-            sidebarLinks.forEach(l => l.classList.remove('active'));
-            tabContents.forEach(t => t.style.display = 'none');
-
-            // Activate the clicked link and tab
-            this.classList.add('active');
-            const targetId = this.getAttribute('data-target');
-            document.getElementById(targetId).style.display = 'block';
-        });
-    });
-
-    // Load saved progress
-    loadSavedProgress();
-});
-
-// Journey Progress Functions
-function loadJourneyCheckpoints() {
-    const tripPlan = `{{ trip.complete_trip_plan|escapejs }}`;
-    const itinerary = `{{ trip.itinerary|escapejs }}`;
-    
-    if (!tripPlan && !itinerary) {
-        showNotification('No trip plan available to parse checkpoints.', 'warning');
-        return;
-    }
-    
-    // Parse checkpoints from the trip plan
-    journeyCheckpoints = parseCheckpointsFromText(tripPlan || itinerary);
-    
-    if (journeyCheckpoints.length === 0) {
-        showNotification('No checkpoints found in the trip plan.', 'warning');
-        return;
-    }
-    
-    // Apply any saved notes to the checkpoints
-    applySavedNotesToCheckpoints();
-    
-    // Render the timeline
-    renderJourneyTimeline();
-    updateProgressDisplay();
-    
-    // Hide the load button
-    document.getElementById('loadJourneySection').style.display = 'none';
-    
-    showNotification(`Loaded ${journeyCheckpoints.length} checkpoints from your trip plan!`, 'success');
-}
-
-function parseCheckpointsFromText(text) {
-    const checkpoints = [];
-    
-    // Strip HTML tags and decode HTML entities for proper text parsing
-    const cleanText = text.replace(/<[^>]*>/g, '')
-                          .replace(/&nbsp;/g, ' ')
-                          .replace(/&amp;/g, '&')
-                          .replace(/&lt;/g, '<')
-                          .replace(/&gt;/g, '>')
-                          .replace(/&quot;/g, '"')
-                          .replace(/&#x27;/g, "'")
-                          .replace(/\r\n/g, '\n')
-                          .replace(/\r/g, '\n');
-    
-    const lines = cleanText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    let currentDay = 1;
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Detect day headers
-        const dayMatch = line.match(/Day\s*(\d+)/i);
-        if (dayMatch) {
-            currentDay = parseInt(dayMatch[1]);
-            continue;
-        }
-        
-        // Pattern matching for different checkpoint formats
-        let checkpoint = null;
-        
-        // Pattern 1: Morning (Temple Darshan): Description
-        const pattern1 = line.match(/^(\w+)\s*\(([^)]+)\):\s*(.+)/);
-        if (pattern1) {
-            checkpoint = createCheckpoint(
-                checkpoints.length,
-                currentDay,
-                pattern1[1], // time (Morning, Afternoon, etc)
-                pattern1[2], // location (Temple Darshan)
-                pattern1[3], // description
-                lines, i
-            );
-        }
-        
-        // Pattern 2: 09:00 - Activity
-        const pattern2 = line.match(/^(\d{1,2}):(\d{2})\s*[-:]\s*(.+)/);
-        if (pattern2) {
-            const timeStr = `${pattern2[1]}:${pattern2[2]}`;
-            const activity = pattern2[3];
-            checkpoint = createCheckpoint(
-                checkpoints.length,
-                currentDay,
-                timeStr,
-                activity.split('.')[0].trim(),
-                activity,
-                lines, i
-            );
-        }
-        
-        // Pattern 3: • Morning (Temple Darshan): Description  
-        const pattern3 = line.match(/^•\s*(\w+)\s*\(([^)]+)\):\s*(.+)/);
-        if (pattern3) {
-            checkpoint = createCheckpoint(
-                checkpoints.length,
-                currentDay,
-                pattern3[1],
-                pattern3[2],
-                pattern3[3],
-                lines, i
-            );
-        }
-        
-        // Pattern 4: Simple time format like "Morning: Activity"
-        const pattern4 = line.match(/^(\w+):\s*(.+)/);
-        if (pattern4 && !pattern1 && !pattern2 && !pattern3) {
-            const timeStr = pattern4[1];
-            const activity = pattern4[2];
-            if (timeStr.match(/morning|afternoon|evening|night/i) || timeStr.match(/\d{1,2}:\d{2}/)) {
-                checkpoint = createCheckpoint(
-                    checkpoints.length,
-                    currentDay,
-                    timeStr,
-                    activity.split('.')[0].trim(),
-                    activity,
-                    lines, i
-                );
-            }
-        }
-        
-        if (checkpoint) {
-            checkpoints.push(checkpoint);
-        }
-    }
-    
-    return checkpoints;
-}
-
-function createCheckpoint(id, day, time, location, description, lines, currentIndex) {
-    // Clean up location and description
-    location = location.replace(/^(visit|explore|go to|head to)\s*/i, '').trim();
-    description = description.trim();
-    
-    // Look for tips in the next few lines
-    let tip = '';
-    for (let j = currentIndex + 1; j < Math.min(currentIndex + 3, lines.length); j++) {
-        const nextLine = lines[j];
-        if (nextLine && 
-            !nextLine.match(/Day\s*\d+/i) && 
-            !nextLine.match(/\d{1,2}:\d{2}/) &&
-            !nextLine.match(/^(\w+):\s*(.+)/) &&
-            (nextLine.toLowerCase().includes('tip') || 
-             nextLine.toLowerCase().includes('avoid') ||
-             nextLine.toLowerCase().includes('reach early') ||
-             nextLine.toLowerCase().includes('take the') ||
-             nextLine.toLowerCase().includes('recommend'))) {
-            tip = nextLine;
-            break;
-        }
-    }
-    
-    // Only create checkpoint if location is meaningful
-    if (location.length > 2 && location.length < 100 && 
-        !location.match(/^\d+$/) && 
-        !location.match(/^(a|an|the|and|or|but|for|at|in|on|to)$/i)) {
-        return {
-            id: id,
-            day: day,
-            time: time,
-            location: location,
-            description: description,
-            tip: tip,
-            completed: false,
-            notes: ''
-        };
-    }
-    
-    return null;
-}
-
-function renderJourneyTimeline() {
-    const container = document.getElementById('timelineContainer');
-    
-    // Group checkpoints by day
-    const dayGroups = {};
-    journeyCheckpoints.forEach(checkpoint => {
-        if (!dayGroups[checkpoint.day]) {
-            dayGroups[checkpoint.day] = [];
-        }
-        dayGroups[checkpoint.day].push(checkpoint);
-    });
-    
-    let timelineHTML = '';
-    
-    Object.keys(dayGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(day => {
-        const dayCheckpoints = dayGroups[day];
-        const completedCount = dayCheckpoints.filter(c => completedCheckpoints.has(c.id)).length;
-        const totalCount = dayCheckpoints.length;
-        const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-        
-        timelineHTML += `
-            <div class="journey-day">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h4 class="mb-1">🌍 Day ${day}</h4>
-                    <span class="badge bg-light text-dark">${completedCount}/${totalCount} completed</span>
-                </div>
-                <div class="day-progress-bar">
-                    <div class="day-progress-fill" style="width: ${progressPercent}%"></div>
-                </div>
-            </div>
-        `;
-        
-        dayCheckpoints.forEach((checkpoint, index) => {
-            const isCompleted = completedCheckpoints.has(checkpoint.id);
-            const isLast = index === dayCheckpoints.length - 1;
-            
-            timelineHTML += `
-                <div class="checkpoint-item ${isCompleted ? 'completed' : ''}" id="checkpoint-${checkpoint.id}">
-                    <div class="checkpoint-time">
-                        🕐 ${checkpoint.time}
-                    </div>
-                    
-                    <div class="checkpoint-location">
-                        📍 ${checkpoint.location}
-                    </div>
-                    
-                    <div class="checkpoint-description">
-                        ${checkpoint.description}
-                    </div>
-                    
-                    ${checkpoint.tip ? `
-                        <div class="checkpoint-tip">
-                            💡 ${checkpoint.tip}
-                        </div>
-                    ` : ''}
-                    
-                    <textarea 
-                        class="experience-notes" 
-                        placeholder="Add your experience notes..."
-                        onchange="saveCheckpointNotes(${checkpoint.id}, this.value)"
-                        ${isCompleted ? '' : 'style="display: none;"'}
-                    >${checkpoint.notes}</textarea>
-                    
-                    <div class="checkpoint-actions">
-                        <div></div>
-                        <button 
-                            class="complete-btn ${isCompleted ? 'completed' : ''}" 
-                            onclick="toggleCheckpointCompletion(${checkpoint.id})"
-                            ${isCompleted ? 'disabled' : ''}
-                        >
-                            ${isCompleted ? '✅ Completed' : '✓ Complete'}
-                        </button>
-                    </div>
-                    
-                    ${!isLast ? '<div class="timeline-connector"></div>' : ''}
-                </div>
-            `;
-        });
-    });
-    
-    container.innerHTML = timelineHTML;
-}
-
-function startJourney() {
-    if (journeyCheckpoints.length === 0) {
-        showNotification('Please load journey checkpoints first!', 'warning');
-        return;
-    }
-    
-    journeyStarted = true;
-    saveProgressToLocalStorage();
-    
-    document.getElementById('startJourneyBtn').innerHTML = '🎯 Journey Started';
-    document.getElementById('startJourneyBtn').classList.add('journey-started');
-    document.getElementById('startJourneyBtn').disabled = true;
-    
-    showNotification('🎉 Journey started! Begin exploring your checkpoints.', 'success');
+function showNotification(message, type) {
+    // This is a placeholder. You might have a more sophisticated notification system.
+    // For now, let's just use an alert or console log.
+    console.log(`Notification (${type}): ${message}`);
+    alert(message); // Simple alert for demonstration
 }
 
 function toggleCheckpointCompletion(checkpointId) {
-    if (!journeyStarted) {
-        showNotification('Please start your journey first!', 'warning');
-        return;
-    }
-    
-    const checkpoint = journeyCheckpoints.find(c => c.id === checkpointId);
-    if (!checkpoint) return;
-    
-    completedCheckpoints.add(checkpointId);
-    checkpoint.completed = true;
-    
-    const element = document.getElementById(`checkpoint-${checkpointId}`);
-    element.classList.add('completed');
-    
-    const button = element.querySelector('.complete-btn');
-    button.innerHTML = '✅ Completed';
-    button.classList.add('completed');
-    button.disabled = true;
-    
-    const textarea = element.querySelector('.experience-notes');
-    textarea.style.display = 'block';
-    
-    updateProgressDisplay();
-    saveProgressToLocalStorage();
-    
-    showNotification(`✅ Completed "${checkpoint.location}"!`, 'success');
-}
+    const checkbox = document.getElementById(`checkpoint-toggle-${checkpointId}`);
+    const isCompleted = checkbox.checked;
+    const checkpointItem = document.getElementById(`checkpoint-${checkpointId}`);
+    const feedbackTextarea = document.getElementById(`feedback-text-${checkpointId}`);
 
-function saveCheckpointNotes(checkpointId, notes) {
-    const checkpoint = journeyCheckpoints.find(c => c.id === checkpointId);
-    if (checkpoint) {
-        checkpoint.notes = notes;
-        saveProgressToLocalStorage();
-        if (notes.trim()) {
-            showNotification('Notes saved!', 'success');
+    fetch(`/planner/trip/${trip.id}/checkpoint/${checkpointId}/complete/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ completed: isCompleted })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (isCompleted) {
+                checkpointItem.classList.add('completed');
+                feedbackTextarea.disabled = false;
+                showNotification('Checkpoint marked as complete!', 'success');
+            } else {
+                checkpointItem.classList.remove('completed');
+                feedbackTextarea.disabled = true;
+                showNotification('Checkpoint marked as incomplete.', 'info');
+            }
+            // Reload page to update progress bars and counts
+            location.reload();
+        } else {
+            showNotification('Error updating checkpoint: ' + data.message, 'error');
+            checkbox.checked = !isCompleted; // Revert checkbox state on error
         }
-    }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('An error occurred while updating checkpoint.', 'error');
+        checkbox.checked = !isCompleted; // Revert checkbox state on error
+    });
 }
 
-function updateProgressDisplay() {
-    const total = journeyCheckpoints.length;
-    const completed = completedCheckpoints.size;
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
-    const progressSummaryEl = document.getElementById('progressSummary');
-    const totalBadgeEl = document.getElementById('totalBadge');
-    const completedBadgeEl = document.getElementById('completedBadge');
-    const remainingBadgeEl = document.getElementById('remainingBadge');
-    const mainProgressBarEl = document.getElementById('mainProgressBar');
-    
-    if (progressSummaryEl) {
-        progressSummaryEl.textContent = `${completed} of ${total} checkpoints completed (${percentage}%)`;
-    }
-    if (totalBadgeEl) {
-        totalBadgeEl.textContent = `${total} Total Stops`;
-    }
-    if (completedBadgeEl) {
-        completedBadgeEl.textContent = `${completed} Completed`;
-    }
-    if (remainingBadgeEl) {
-        remainingBadgeEl.textContent = `${total - completed} Remaining`;
-    }
-    if (mainProgressBarEl) {
-        mainProgressBarEl.style.width = `${percentage}%`;
-    }
-    
-    // Re-render timeline to update day progress if we're in the journey section
-    const currentSection = document.querySelector('.content-section[style*="block"]') || 
-                          document.querySelector('.content-section.active');
-    if (currentSection && currentSection.id === 'journey-progress' && journeyCheckpoints.length > 0) {
-        renderJourneyTimeline();
-    }
+function submitCheckpointFeedback(checkpointId) {
+    const feedbackTextarea = document.getElementById(`feedback-text-${checkpointId}`);
+    const feedback = feedbackTextarea.value;
+
+    fetch(`/planner/trip/${trip.id}/checkpoint/${checkpointId}/feedback/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ feedback: feedback })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showNotification('Feedback saved successfully!', 'success');
+        } else {
+            showNotification('Error saving feedback: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('An error occurred while saving feedback.', 'error');
+    });
 }
 
 function saveProgressToLocalStorage() {
@@ -964,7 +726,7 @@ function generateCompleteTrip(tripId) {
                 });
             }
             
-            // Auto-load journey checkpoints if we're on the journey progress section
+            // Auto-load journey checkpoints if we\\'re on the journey progress section
             const journeySection = document.getElementById('journey-progress');
             if (journeySection && journeySection.style.display !== 'none') {
                 setTimeout(() => {
@@ -1097,5 +859,26 @@ function removeTypingIndicator() {
         typingIndicator.remove();
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(event) {
+            event.preventDefault(); // Prevent default anchor link behavior
+            const targetId = this.getAttribute('data-target');
+            switchToSection(targetId);
+
+            // Update URL hash without reloading the page
+            history.pushState(null, '', `#${targetId}`);
+        });
+    });
+
+    // Handle initial load with hash in URL
+    if (window.location.hash) {
+        const initialSectionId = window.location.hash.substring(1); // Remove '#'
+        switchToSection(initialSectionId);
+    }
+});
 </script>
 {% endblock %}

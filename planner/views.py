@@ -1,13 +1,14 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 import traceback
+import asyncio
 from django.contrib.auth.decorators import login_required
-from .models import Trip, ChatMessage
+from .models import Trip, ChatMessage, Checkpoint, Feedback
 from .forms import TripForm
 from .langgraph_logic import graph, generate_itinerary, recommend_activities_agent, fetch_useful_links_agent, weather_forecaster_agent, packing_list_generator_agent, food_culture_recommender_agent, chat_agent, accommodation_recommender_agent, expense_breakdown_agent, complete_trip_plan_agent, generate_complete_trip_automatically
 from django.http import JsonResponse, HttpResponse
 import json
-from django.urls import reverse # Added import
-from django.views.decorators.http import require_POST # Added import
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 from users.models import UserProfile
 from django.contrib import messages
 from fpdf import FPDF
@@ -15,114 +16,129 @@ import requests
 import os
 from datetime import datetime
 import re
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
+from asgiref.sync import sync_to_async
 
 @login_required
 def dashboard(request):
     return render(request, 'planner/dashboard.html')
 
 @login_required
-def create_trip(request):
-    form = TripForm() # Initialize form outside if/else for GET request
+async def create_trip(request):
+    form = TripForm()
     payment_required = False
     trip_data = {}
-    user_profile, created = UserProfile.objects.get_or_create(user=request.user)
+    user_profile, created = await sync_to_async(UserProfile.objects.get_or_create)(user=request.user)
 
     if request.method == 'POST':
         form = TripForm(request.POST)
         if form.is_valid():
-            # Check for prepaid itineraries first
             if request.user.prepaid_itineraries_count > 0:
                 request.user.prepaid_itineraries_count -= 1
-                request.user.save()
-                # Proceed with trip creation
+                await sync_to_async(request.user.save)()
             elif request.user.free_itineraries_count < 2:
                 request.user.free_itineraries_count += 1
-                request.user.save()
-                # Proceed with trip creation
+                await sync_to_async(request.user.save)()
             elif user_profile.paid_plan_credits >= 5:
                 user_profile.paid_plan_credits -= 5
-                user_profile.save()
+                await sync_to_async(user_profile.save)()
             else:
-                # User has used up free itineraries and has no prepaid ones, payment required
                 messages.warning(request, 'You have used all your free itineraries. Please add money to your wallet to create more.')
                 return redirect('add_money')
 
-            # If we reach here, it means either free or prepaid itinerary was consumed
             trip = form.save(commit=False)
             trip.user = request.user
-            trip.save()
-            config = {"configurable": {"thread_id": trip.id}}
+            await sync_to_async(trip.save)()
+            
             inputs = {"trip_id": trip.id}
             try:
-                graph.invoke(inputs, config=config)
-                trip.refresh_from_db() # Refresh to get the generated itinerary
+                await generate_complete_trip_automatically(inputs)
+                await sync_to_async(trip.refresh_from_db)()
             except Exception as e:
-                print(f"Error generating itinerary automatically: {e}")
-            return redirect('trip_detail', trip_id=trip.id)
+                print(f"Error generating complete trip automatically: {e}")
+            
+            return redirect('planner:trip_detail', trip_id=trip.id)
     
-    # Calculate remaining_free_itineraries for both GET and POST (if not redirected)
     remaining_free_itineraries = 2 - request.user.free_itineraries_count
 
     return render(request, 'planner/create_trip.html', {
         'form': form,
         'payment_required': payment_required,
-        'trip_data': json.dumps(trip_data) if trip_data else '{}', # Ensure trip_data is JSON string
+        'trip_data': json.dumps(trip_data) if trip_data else '{}',
         'remaining_free_itineraries': remaining_free_itineraries,
     })
 
-# New view for creating trip after payment
 @login_required
 @require_POST
-def create_paid_trip(request):
+async def create_paid_trip(request):
     form = TripForm(request.POST)
     if form.is_valid():
-        user_profile = UserProfile.objects.get(user=request.user)
+        user_profile = await sync_to_async(UserProfile.objects.get)(user=request.user)
         if user_profile.paid_plan_credits >= 5:
             user_profile.paid_plan_credits -= 5
-            user_profile.save()
+            await sync_to_async(user_profile.save)()
 
             trip = form.save(commit=False)
             trip.user = request.user
-            trip.save()
-            config = {"configurable": {"thread_id": trip.id}}
-            inputs = {"trip_id": trip.id}
-            try:
-                graph.invoke(inputs, config=config)
-                trip.refresh_from_db() # Refresh to get the generated itinerary
-            except Exception as e:
-                print(f"Error generating itinerary automatically: {e}")
-            return JsonResponse({'status': 'success', 'redirect_url': reverse('trip_detail', kwargs={'trip_id': trip.id})})
+            await sync_to_async(trip.save)()
+            
+            state = {"trip_id": trip.id}
+            await generate_itinerary(state)
+            await sync_to_async(trip.refresh_from_db)()
+
+            
+
+            return JsonResponse({'status': 'success', 'redirect_url': reverse('planner:trip_detail', kwargs={'trip_id': trip.id})})
         else:
             return JsonResponse({'status': 'error', 'message': 'Insufficient balance.'}, status=400)
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid form data', 'errors': form.errors}, status=400)
 
-
 @login_required
 def trip_detail(request, trip_id):
-    trip = Trip.objects.get(id=trip_id, user=request.user)
+    trip = get_object_or_404(Trip, id=trip_id, user=request.user)
+    checkpoints = trip.checkpoint_set.all().order_by('id')
+
+    daily_checkpoints_data = {}
+    for checkpoint in checkpoints:
+        day_prefix_match = re.match(r'(Day \d+)', checkpoint.name)
+        day_prefix = day_prefix_match.group(1) if day_prefix_match else "Other Checkpoints"
+
+        if day_prefix not in daily_checkpoints_data:
+            daily_checkpoints_data[day_prefix] = {
+                'checkpoints': [], 'completed_count': 0, 'total_count': 0, 'progress_percentage': 0
+            }
+        
+        daily_checkpoints_data[day_prefix]['checkpoints'].append(checkpoint)
+        daily_checkpoints_data[day_prefix]['total_count'] += 1
+        if checkpoint.completed:
+            daily_checkpoints_data[day_prefix]['completed_count'] += 1
     
-    # Get weather data for the destination
+    for day_data in daily_checkpoints_data.values():
+        if day_data['total_count'] > 0:
+            day_data['progress_percentage'] = round((day_data['completed_count'] / day_data['total_count']) * 100, 2)
+
     weather_data = get_current_weather(trip.destination)
-    
-    # Calculate progress - using existing data structure
     progress_data = calculate_trip_progress(trip)
     
     context = {
         'trip': trip,
         'weather_data': weather_data,
         'progress_data': progress_data,
+        'daily_checkpoints_data': daily_checkpoints_data,
     }
     return render(request, 'planner/trip_detail_interactive.html', context)
 
 @login_required
-def process_trip(request, trip_id):
-    trip = Trip.objects.get(id=trip_id, user=request.user)
+async def process_trip(request, trip_id):
+    trip = await sync_to_async(Trip.objects.get)(id=trip_id, user=request.user)
     if request.method == 'POST':
         agent_name = request.POST.get('agent_name')
         user_question = request.POST.get('user_question')
 
-        # Map agent names to their functions
         agent_functions = {
             "generate_itinerary": generate_itinerary,
             "generate_complete_trip": generate_complete_trip_automatically,
@@ -142,32 +158,20 @@ def process_trip(request, trip_id):
         if not selected_agent_function:
             return JsonResponse({'status': 'error', 'message': 'Invalid agent name provided.'})
 
-        # Construct the state dictionary for the agent function
-        # This needs to match the GraphState structure expected by the agent functions
         state = {
-            "trip_id": trip.id,
-            "preferences_text": "", # Not directly used by all agents, but part of GraphState
-            "itinerary": trip.itinerary,
-            "activity_suggestions": trip.activity_suggestions,
-            "useful_links": trip.useful_links,
-            "weather_forecast": trip.weather_forecast,
-            "packing_list": trip.packing_list,
-            "food_culture_info": trip.food_culture_info,
-            "accommodation_info": trip.accommodation_info,
+            "trip_id": trip.id, "preferences_text": "", "itinerary": trip.itinerary,
+            "activity_suggestions": trip.activity_suggestions, "useful_links": trip.useful_links,
+            "weather_forecast": trip.weather_forecast, "packing_list": trip.packing_list,
+            "food_culture_info": trip.food_culture_info, "accommodation_info": trip.accommodation_info,
             "expense_breakdown": trip.expense_breakdown,
-            "complete_trip_plan": trip.complete_trip_plan,
-            "chat_history": [], # Chat history is handled separately in chat_agent
-            "user_question": user_question,
-            "chat_response": "",
+            "chat_history": [], "user_question": user_question, "chat_response": "",
         }
 
         try:
-            # Directly call the selected agent function
-            result = selected_agent_function(state)
+            result = await selected_agent_function(state)
+            await sync_to_async(trip.refresh_from_db)()
             
-            # Refresh trip object to get latest data updated by the agent
-            trip.refresh_from_db()
-            
+            last_chat_message = await sync_to_async(trip.chatmessage_set.last)()
             response_data = {
                 'status': 'success',
                 'itinerary': trip.itinerary,
@@ -178,13 +182,10 @@ def process_trip(request, trip_id):
                 'food_culture_info': trip.food_culture_info,
                 'accommodation_info': trip.accommodation_info,
                 'expense_breakdown': trip.expense_breakdown,
-                'complete_trip_plan': trip.complete_trip_plan,
-                'chat_response': trip.chatmessage_set.last().response if trip.chatmessage_set.exists() else ''
+                'chat_response': last_chat_message.response if last_chat_message else ''
             }
-            # Add warning if present in agent's result
             if isinstance(result, dict) and "warning" in result:
                 response_data["warning"] = result["warning"]
-            # Handle warnings (plural) from comprehensive generation
             if isinstance(result, dict) and "warnings" in result:
                 response_data["warnings"] = result["warnings"]
             return JsonResponse(response_data)
@@ -195,26 +196,20 @@ def process_trip(request, trip_id):
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
 @login_required
-def chat_with_agent(request, trip_id):
-    trip = Trip.objects.get(id=trip_id, user=request.user)
+async def chat_with_agent(request, trip_id):
+    trip = await sync_to_async(Trip.objects.get)(id=trip_id, user=request.user)
     if request.method == 'POST':
         user_question = request.POST.get('user_question')
         
-        # Construct the state dictionary for the chat_agent function
         state = {
-            "trip_id": trip.id,
-            "user_question": user_question,
-            "complete_trip_plan": trip.complete_trip_plan,
-            "chat_history": [], # Chat history is handled within the agent
-            "chat_response": "",
+            "trip_id": trip.id, "user_question": user_question,
+            "chat_history": [], "chat_response": "",
         }
 
-        print(f"Inputs to chat_agent: {state}")
-
         try:
-            result = chat_agent(state)
-            trip.refresh_from_db()
-            chat_message = trip.chatmessage_set.last()
+            result = await chat_agent(state)
+            await sync_to_async(trip.refresh_from_db)()
+            chat_message = await sync_to_async(trip.chatmessage_set.last)()
             response_data = {'status': 'success', 'chat_response': chat_message.response}
             if isinstance(result, dict) and "warning" in result:
                 response_data["warning"] = result["warning"]
@@ -224,6 +219,42 @@ def chat_with_agent(request, trip_id):
             print(traceback.format_exc())
             return JsonResponse({'status': 'error', 'message': str(e)})
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+
+@login_required
+@require_POST
+def mark_checkpoint_complete(request, trip_id, checkpoint_id):
+    checkpoint = get_object_or_404(Checkpoint, id=checkpoint_id, trip__user=request.user, trip_id=trip_id)
+    try:
+        data = json.loads(request.body)
+        completed = data.get('completed')
+        if isinstance(completed, bool):
+            checkpoint.completed = completed
+            checkpoint.save()
+            return JsonResponse({'status': 'success', 'completed': completed})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid value for completed'}, status=400)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+
+@login_required
+@require_POST
+def submit_checkpoint_feedback(request, trip_id, checkpoint_id):
+    checkpoint = get_object_or_404(Checkpoint, id=checkpoint_id, trip__user=request.user, trip_id=trip_id)
+    try:
+        data = json.loads(request.body)
+        feedback_text = data.get('feedback')
+        if feedback_text is not None:
+            feedback, created = Feedback.objects.update_or_create(
+                checkpoint=checkpoint,
+                user=request.user,
+                defaults={'feedback': feedback_text}
+            )
+            return JsonResponse({'status': 'success', 'feedback': feedback_text})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Feedback text is required'}, status=400)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
 
 # Helper functions for weather and progress tracking
 def get_current_weather(destination):
@@ -243,20 +274,22 @@ def get_current_weather(destination):
 def calculate_trip_progress(trip):
     """Calculate trip progress based on existing itinerary data"""
     try:
+        total_checkpoints = trip.checkpoint_set.count()
+        completed_checkpoints = trip.checkpoint_set.filter(completed=True).count()
+        
+        progress_percentage = 0
+        if total_checkpoints > 0:
+            progress_percentage = (completed_checkpoints / total_checkpoints) * 100
+
         progress_data = {
-            'total_stops': 14,
-            'completed_stops': 0,
-            'progress_percentage': 0,
+            'total_stops': total_checkpoints,
+            'completed_stops': completed_checkpoints,
+            'progress_percentage': round(progress_percentage, 2),
+            'remaining_stops': total_checkpoints - completed_checkpoints,
         }
-        
-        if trip.itinerary:
-            activities = len(re.findall(r'Day \d+', trip.itinerary))
-            progress_data['total_stops'] = max(activities, 14)
-        
-        progress_data['remaining_stops'] = progress_data['total_stops'] - progress_data['completed_stops']
         return progress_data
     except Exception:
-        return {'total_stops': 14, 'completed_stops': 0, 'remaining_stops': 14, 'progress_percentage': 0}
+        return {'total_stops': 0, 'completed_stops': 0, 'remaining_stops': 0, 'progress_percentage': 0}
 
 @login_required
 def download_trip_pdf(request, trip_id):
@@ -265,27 +298,22 @@ def download_trip_pdf(request, trip_id):
     
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
+    pdf.set_font('helvetica', '', 16)
     pdf.cell(190, 10, f"Trip to {trip.destination}", ln=True, align='C')
     pdf.ln(10)
     
-    pdf.set_font("Arial", 'B', 12)
+    pdf.set_font('helvetica', '', 12)
     pdf.cell(190, 10, "Trip Details", ln=True)
-    pdf.set_font("Arial", '', 10)
+    pdf.set_font('helvetica', '', 10)
     pdf.cell(190, 8, f"Destination: {trip.destination}", ln=True)
     pdf.cell(190, 8, f"Duration: {trip.duration} days", ln=True)
     pdf.cell(190, 8, f"Month: {trip.month}", ln=True)
     pdf.cell(190, 8, f"Type: {trip.holiday_type}", ln=True)
     pdf.ln(10)
     
-    if trip.complete_trip_plan:
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(190, 10, "Complete Itinerary", ln=True)
-        pdf.set_font("Arial", '', 8)
-        
-        clean_text = re.sub('<.*?>', '', trip.complete_trip_plan)
+    def write_html(html):
+        clean_text = re.sub('<.*?>', '', html)
         clean_text = clean_text.replace('&nbsp;', ' ').replace('&amp;', '&')
-        
         lines = clean_text.split('\n')
         for line in lines:
             if len(line.strip()) > 0:
@@ -294,8 +322,76 @@ def download_trip_pdf(request, trip_id):
                     line = line[80:]
                 if line.strip():
                     pdf.cell(190, 5, line, ln=True)
+
+    if trip.itinerary:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Itinerary", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(trip.itinerary)
+        pdf.ln(10)
+
+    if trip.activity_suggestions:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Activity Suggestions", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        for activity in trip.activity_suggestions:
+            pdf.cell(190, 5, f"- {activity['name']}", ln=True)
+        pdf.ln(10)
+
+    if trip.useful_links:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Useful Links", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        for link in trip.useful_links:
+            pdf.cell(190, 5, f"- {link['title']}: {link['link']}", ln=True)
+        pdf.ln(10)
+
+    if trip.weather_forecast:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Weather Forecast", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(trip.weather_forecast)
+        pdf.ln(10)
+
+    if trip.packing_list:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Packing List", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(trip.packing_list)
+        pdf.ln(10)
+
+    if trip.food_culture_info:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Food and Culture", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(json.dumps(trip.food_culture_info, indent=4))
+        pdf.ln(10)
+
+    if trip.accommodation_info:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Accommodation", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(json.dumps(trip.accommodation_info, indent=4))
+        pdf.ln(10)
+
+    if trip.expense_breakdown:
+        pdf.set_font('helvetica', '', 12)
+        pdf.cell(190, 10, "Expense Breakdown", ln=True)
+        pdf.set_font('helvetica', '', 8)
+        write_html(trip.expense_breakdown)
+        pdf.ln(10)
+
+    
     
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="trip_{trip.destination}_{trip.id}.pdf"'
     response.write(pdf.output(dest='S'))
     return response
+
+
+@login_required
+def finalize_trip(request, trip_id):
+    trip = Trip.objects.get(id=trip_id, user=request.user)
+    
+    messages.info(request, 'Finalize trip functionality has been removed.')
+    return redirect('planner:trip_detail', trip_id=trip.id)

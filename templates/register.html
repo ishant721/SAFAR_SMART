@@ -176,7 +176,8 @@
                 otpSection.style.display = 'block';
                 startCountdown();
             } else {
-                showMessage('danger', data.email ? data.email[0] : data.username ? data.username[0] : data.password ? data.password[0] : data.password2 ? data.password2[0] : data.message || 'Registration failed.');
+                const errorMessage = Object.values(data).flat().join(' ');
+showMessage('danger', errorMessage || 'Registration failed.');
             }
         } catch (error) {
             showMessage('danger', 'An error occurred. Please try again.');

@@ -32,7 +32,7 @@
             </div>
             <h1 class="display-2 fw-bolder mb-4">Welcome Back, <span style="color: #8b5cf6;">{{ user.username }}</span></h1>
             <p class="lead mb-5">Your next adventure awaits. Let's create unforgettable memories together.</p>
-            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg">
+            <a href="{% url 'planner:create_trip' %}" class="btn btn-primary-modern btn-lg">
                 <i class="bi bi-plus-circle me-2"></i>Plan a New Trip
             </a>
         </div>
@@ -135,7 +135,7 @@
                             {% if trip.comments %}
                             <p class="text-muted small mb-4">{{ trip.comments|truncatewords:15 }}</p>
                             {% endif %}
-                            <a href="{% url 'trip_detail' trip.id %}" class="btn btn-primary-modern w-100">
+                            <a href="{% url 'planner:trip_detail' trip.id %}" class="btn btn-primary-modern w-100">
                                 <i class="bi bi-eye me-2"></i>View Full Itinerary
                             </a>
                         </div>
@@ -153,7 +153,7 @@
                             </div>
                             <h4 class="fw-bold mb-3" style="color: #1f2937;">Your Travel Journal is Empty</h4>
                             <p class="text-muted mb-4">Let's change that! Start planning your next great escape with our AI-powered travel planner.</p>
-                            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg">
+                            <a href="{% url 'planner:create_trip' %}" class="btn btn-primary-modern btn-lg">
                                 <i class="bi bi-plus-circle me-2"></i>Create Your First Trip
                             </a>
                         </div>
@@ -177,7 +177,7 @@
                     </div>
                     <h5 class="fw-bold mt-3" style="color: #1f2937;">Plan New Trip</h5>
                     <p style="color: #6b7280;">Start creating your next adventure with our AI travel planner.</p>
-                    <a href="{% url 'create_trip' %}" class="btn btn-outline-modern">Get Started</a>
+                    <a href="{% url 'planner:create_trip' %}" class="btn btn-outline-modern">Get Started</a>
                 </div>
                 <div class="col-md-4 text-center">
                     <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);">
@@ -264,7 +264,7 @@
         <div class="container-fluid px-4 text-center">
             <h2 class="h1 fw-bold" style="color: #1f2937; margin-bottom: 1rem;">Ready for Your Next Adventure?</h2>
             <p class="lead mb-4" style="color: #6b7280; font-size: 1.2rem;">Let SAFAR_SMART create the perfect itinerary for your next journey.</p>
-            <a href="{% url 'create_trip' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">
+            <a href="{% url 'planner:create_trip' %}" class="btn btn-primary-modern btn-lg" style="padding: 1.2rem 3rem; font-size: 1.1rem; font-weight: 700;">
                 <i class="bi bi-plus-circle me-2"></i>Plan Your Next Trip
             </a>
         </div>

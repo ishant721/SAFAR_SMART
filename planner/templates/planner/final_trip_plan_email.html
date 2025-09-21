@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your Finalized Trip Plan</title>
+</head>
+<body>
+    <h1>Your Finalized Trip Plan for {{ trip.destination }}</h1>
+    
+    <h2>Trip Details</h2>
+    <ul>
+        <li><strong>Destination:</strong> {{ trip.destination }}</li>
+        <li><strong>Month:</strong> {{ trip.month }}</li>
+        <li><strong>Duration:</strong> {{ trip.duration }} days</li>
+        <li><strong>Number of People:</strong> {{ trip.num_people }}</li>
+        <li><strong>Holiday Type:</strong> {{ trip.holiday_type }}</li>
+        <li><strong>Budget:</strong> {{ trip.budget_type }}</li>
+    </ul>
+    
+    {% if trip.comments %}
+    <h2>Your Comments</h2>
+    <p>{{ trip.comments }}</p>
+    {% endif %}
+    
+    {% if trip.itinerary %}
+    <h2>Itinerary</h2>
+    <div>{{ trip.itinerary|safe }}</div>
+    {% endif %}
+    
+    {% if trip.activity_suggestions %}
+    <h2>Activity Suggestions</h2>
+    <ul>
+        {% for activity in trip.activity_suggestions %}
+        <li><a href="{{ activity.link }}">{{ activity.name }}</a>: {{ activity.snippet }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    {% if trip.useful_links %}
+    <h2>Useful Links</h2>
+    <ul>
+        {% for link in trip.useful_links %}
+        <li><a href="{{ link.link }}">{{ link.title }}</a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    {% if trip.weather_forecast %}
+    <h2>Weather Forecast</h2>
+    <div>{{ trip.weather_forecast|safe }}</div>
+    {% endif %}
+    
+    {% if trip.packing_list %}
+    <h2>Packing List</h2>
+    <div>{{ trip.packing_list|safe }}</div>
+    {% endif %}
+    
+    {% if trip.food_culture_info %}
+    <h2>Food and Culture</h2>
+    {% if trip.food_culture_info.food_options %}
+    <h3>Food Options</h3>
+    <ul>
+        {% for item in trip.food_culture_info.food_options %}
+        <li><a href="{{ item.link }}">{{ item.name }}</a>: {{ item.snippet }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% if trip.food_culture_info.cultural_info %}
+    <h3>Cultural Information</h3>
+    <div>{{ trip.food_culture_info.cultural_info|safe }}</div>
+    {% endif %}
+    {% endif %}
+    
+    {% if trip.accommodation_info %}
+    <h2>Accommodation</h2>
+    <ul>
+        {% for item in trip.accommodation_info %}
+        <li><a href="{{ item.link }}">{{ item.name }}</a> {% if item.rating %}(Rating: {{ item.rating }}){% endif %}: {{ item.snippet }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
+    {% if trip.expense_breakdown %}
+    <h2>Expense Breakdown</h2>
+    <div>{{ trip.expense_breakdown|safe }}</div>
+    {% endif %}
+    
+    {% if trip.complete_trip_plan %}
+    <h2>Complete Trip Plan</h2>
+    <div>{{ trip.complete_trip_plan|safe }}</div>
+    {% endif %}
+    
+</body>
+</html>

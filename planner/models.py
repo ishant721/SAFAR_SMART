@@ -20,6 +20,8 @@ class Trip(models.Model):
     accommodation_info = models.JSONField(blank=True, null=True)
     expense_breakdown = models.TextField(blank=True, null=True)
     complete_trip_plan = models.TextField(blank=True, null=True)
+    is_finalized = models.BooleanField(default=False)
+    trip_status = models.CharField(max_length=20, default='draft')
     
     def __str__(self):
         return f"Trip to {self.destination} for {self.user.username}"
@@ -32,3 +34,20 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"Message for trip {self.trip.id}"
+
+class Checkpoint(models.Model):
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    completed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+class Feedback(models.Model):
+    checkpoint = models.ForeignKey(Checkpoint, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    feedback = models.TextField()
+
+    def __str__(self):
+        return f"Feedback for {self.checkpoint.name} by {self.user.username}"

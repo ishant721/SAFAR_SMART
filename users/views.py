@@ -123,7 +123,7 @@ def login_view(request):
             if user is not None:
                 if user.is_active:
                     login(request, user)
-                    return redirect('/dashboard/')
+                    return redirect('planner:dashboard')
                 else:
                     # User is registered but not verified - redirect to verification
                     request.session['verification_email'] = email
@@ -270,7 +270,7 @@ def registration_verify_otp_view(request):
         
         # Log the user in automatically after successful verification
         login(request, user)
-        return redirect('/dashboard/')
+        return redirect('planner:dashboard')
     else:
         email = request.GET.get('email')
         return render(request, 'registration_verify_otp.html', {'email': email})
@@ -306,7 +306,7 @@ def login_verify_otp_view(request):
         
         # Log the user in automatically
         login(request, user)
-        return redirect('/dashboard/')
+        return redirect('planner:dashboard')
     else:
         email = request.session.get('verification_email')
         if not email:
