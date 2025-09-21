@@ -18,7 +18,7 @@ from asgiref.sync import sync_to_async
 load_dotenv()
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", google_api_key=os.getenv("GOOGLE_API_KEY"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize GoogleSerperAPIWrapper
 search = GoogleSerperAPIWrapper(serper_api_key=os.getenv("SERPER_API_KEY"))
@@ -71,28 +71,50 @@ class GraphState(TypedDict):
     chat_response: str
 
 # Agent functions
+import time
+
 async def generate_itinerary(state):
+    print("--- generate_itinerary: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     preferences_text = f"Destination: {trip.destination}\nMonth: {trip.month}\nDuration: {trip.duration} days\nPeople: {trip.num_people}\nType: {trip.holiday_type}\nBudget: {trip.budget_type}\nComments: {trip.comments}"
     prompt = f"""
-    Using the following preferences, create a detailed itinerary:
-    {preferences_text}
+    Create a detailed itinerary based on these preferences:
+    - Destination: {trip.destination}
+    - Month: {trip.month}
+    - Duration: {trip.duration} days
+    - People: {trip.num_people}
+    - Type: {trip.holiday_type}
+    - Budget: {trip.budget_type}
+    - Comments: {trip.comments}
 
-    Include sections for each day, dining options, and downtime.
+    For each day, include dining options and downtime.
     """
     try:
+        llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
+        llm_end_time = time.time()
+        print(f"--- generate_itinerary: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
         trip.itinerary = convert_markdown_to_html(result.content.strip())
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- generate_itinerary: END ({end_time - start_time:.2f} seconds) ---")
         return {"itinerary": trip.itinerary}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- generate_itinerary: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"itinerary": "", "warning": str(e)}
 
 async def recommend_activities_agent(state):
+    print("--- recommend_activities_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     query = f"Unique local activities in {trip.destination} for {trip.month}"
     try:
+        search_start_time = time.time()
         search_results = await sync_to_async(search.results)(query)
+        search_end_time = time.time()
+        print(f"--- recommend_activities_agent: Search call took {search_end_time - search_start_time:.2f} seconds ---")
         organic_results = search_results.get("organic", [])
         activities = []
         for result in organic_results[:5]:
@@ -106,15 +128,24 @@ async def recommend_activities_agent(state):
         
         trip.activity_suggestions = [act.dict() for act in activities]
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- recommend_activities_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"activity_suggestions": trip.activity_suggestions}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- recommend_activities_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"activity_suggestions": [], "warning": f"Failed to fetch activities: {str(e)}"}
 
 async def fetch_useful_links_agent(state):
+    print("--- fetch_useful_links_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     query = f"Travel tips and guides for {trip.destination} in {trip.month}"
     try:
+        search_start_time = time.time()
         search_results = await sync_to_async(search.results)(query)
+        search_end_time = time.time()
+        print(f"--- fetch_useful_links_agent: Search call took {search_end_time - search_start_time:.2f} seconds ---")
         organic_results = search_results.get("organic", [])
         links = [
             UsefulLink(title=result.get("title", "No title"), link=result.get("link", ""))
@@ -124,44 +155,71 @@ async def fetch_useful_links_agent(state):
         links = [UsefulLink(title=title, link=link) for title, link in unique_links_data]
         trip.useful_links = [link.dict() for link in links]
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- fetch_useful_links_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"useful_links": trip.useful_links}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- fetch_useful_links_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"useful_links": [], "warning": f"Failed to fetch links: {str(e)}"}
 
 async def weather_forecaster_agent(state):
+    print("--- weather_forecaster_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     prompt = f"""
-    Based on the destination and month, provide a detailed weather forecast including temperature, precipitation, and advice for travelers:
-    Destination: {trip.destination}
-    Month: {trip.month}
+    Provide a weather forecast for {trip.destination} in {trip.month}.
+    Include temperature, precipitation, and travel advice.
     """
     try:
+        llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
+        llm_end_time = time.time()
+        print(f"--- weather_forecaster_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
         trip.weather_forecast = convert_markdown_to_html(result.content.strip())
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- weather_forecaster_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"weather_forecast": trip.weather_forecast}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- weather_forecaster_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"weather_forecast": "", "warning": str(e)}
 
 async def packing_list_generator_agent(state):
+    print("--- packing_list_generator_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     prompt = f"""
-    Generate a comprehensive packing list for a {trip.holiday_type} holiday in {trip.destination} during {trip.month} for {trip.duration} days.
-    Include essentials based on expected weather and trip type.
+    Generate a packing list for a {trip.holiday_type} trip to {trip.destination} in {trip.month} for {trip.duration} days.
+    Use bullet points for each item.
+    Base the list on the weather and trip type.
     """
     try:
+        llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
+        llm_end_time = time.time()
+        print(f"--- packing_list_generator_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
         trip.packing_list = convert_markdown_to_html(result.content.strip())
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- packing_list_generator_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"packing_list": trip.packing_list}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- packing_list_generator_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"packing_list": "", "warning": str(e)}
 
 async def food_culture_recommender_agent(state):
+    print("--- food_culture_recommender_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     query = f"Popular local dishes and dining options in {trip.destination} for {trip.budget_type} budget"
     try:
+        search_start_time = time.time()
         search_results = await sync_to_async(search.results)(query)
+        search_end_time = time.time()
+        print(f"--- food_culture_recommender_agent: Search call took {search_end_time - search_start_time:.2f} seconds ---")
         organic_results = search_results.get("organic", [])
         food_options = []
         for result in organic_results[:5]:
@@ -174,60 +232,36 @@ async def food_culture_recommender_agent(state):
             ))
         
         cultural_prompt = f"""
-        For a trip to {trip.destination}, provide important cultural norms, etiquette tips, and things travelers should be aware of.
-        Format the response with clear sections for 'Culture & Etiquette'.
+        Provide a list of important cultural norms and etiquette tips for a trip to {trip.destination}.
         """
+        llm_start_time = time.time()
         cultural_info_result = await sync_to_async(llm.invoke)([HumanMessage(content=cultural_prompt)])
+        llm_end_time = time.time()
+        print(f"--- food_culture_recommender_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
         cultural_info = convert_markdown_to_html(cultural_info_result.content.strip())
 
         food_culture_info = FoodCultureInfo(food_options=[fo.dict() for fo in food_options], cultural_info=cultural_info)
         trip.food_culture_info = food_culture_info.dict()
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- food_culture_recommender_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"food_culture_info": trip.food_culture_info}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- food_culture_recommender_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"food_culture_info": {}, "warning": f"Failed to fetch food and culture: {str(e)}"}
 
 async def generate_complete_trip_automatically(state):
     print(f"Starting complete trip generation for trip {state['trip_id']}")
-    warnings = []
+    
+    config = {"configurable": {"thread_id": str(state['trip_id'])}}
     
     try:
-        itinerary_result = await generate_itinerary(state)
-        if itinerary_result.get('warning'): warnings.append(f"Itinerary: {itinerary_result['warning']}")
-        
-        activities_result = await recommend_activities_agent(state)
-        if activities_result.get('warning'): warnings.append(f"Activities: {activities_result['warning']}")
-        
-        links_result = await fetch_useful_links_agent(state)
-        if links_result.get('warning'): warnings.append(f"Links: {links_result['warning']}")
-            
-        weather_result = await weather_forecaster_agent(state)
-        if weather_result.get('warning'): warnings.append(f"Weather: {weather_result['warning']}")
-            
-        packing_result = await packing_list_generator_agent(state)
-        if packing_result.get('warning'): warnings.append(f"Packing: {packing_result['warning']}")
-            
-        food_culture_result = await food_culture_recommender_agent(state)
-        if food_culture_result.get('warning'): warnings.append(f"Food/Culture: {food_culture_result['warning']}")
-            
-        accommodation_result = await accommodation_recommender_agent(state)
-        if accommodation_result.get('warning'): warnings.append(f"Accommodation: {accommodation_result['warning']}")
-            
-        expense_result = await expense_breakdown_agent(state)
-        if expense_result.get('warning'): warnings.append(f"Expenses: {expense_result['warning']}")
-            
-        complete_plan_result = await complete_trip_plan_agent(state)
-        if complete_plan_result.get('warning'): warnings.append(f"Complete Plan: {complete_plan_result['warning']}")
-        
-        trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
-        
+        final_state = await graph.ainvoke(state, config=config)
+        print(f"Finished complete trip generation for trip {state['trip_id']}")
         return {
-            "complete_generation": True, "itinerary": trip.itinerary,
-            "activity_suggestions": trip.activity_suggestions, "useful_links": trip.useful_links,
-            "weather_forecast": trip.weather_forecast, "packing_list": trip.packing_list,
-            "food_culture_info": trip.food_culture_info, "accommodation_info": trip.accommodation_info,
-            "expense_breakdown": trip.expense_breakdown,
-            "warnings": warnings if warnings else None
+            "complete_generation": True,
+            **final_state
         }
         
     except Exception as e:
@@ -325,9 +359,22 @@ async def update_complete_trip_plan(trip_id: int, instruction: str = None) -> st
     if result.get("warning"): return f"Failed to update complete trip plan: {result['warning']}"
     return "Complete trip plan updated successfully."
 
+@tool
+async def generate_full_trip_plan(trip_id: int, instruction: str = None) -> str:
+    """
+    Generates a complete trip plan from scratch, including itinerary, activities, and all other details.
+    Use this tool when the user asks to generate a new trip plan or to start over.
+    """
+    state = {"trip_id": trip_id, "user_question": instruction or ""}
+    result = await generate_complete_trip_automatically(state)
+    if result.get("warning"):
+        return f"Failed to generate full trip plan: {result['warning']}"
+    return "Full trip plan generated successfully."
+
 tools = [
     update_activities, update_useful_links, update_weather_forecast, update_packing_list,
     update_food_culture_info, update_accommodation_info, update_expense_breakdown, update_complete_trip_plan,
+    generate_full_trip_plan,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -368,10 +415,15 @@ async def chat_agent(state):
     return {"chat_response": convert_markdown_to_html(chat_response_text)}
 
 async def accommodation_recommender_agent(state):
+    print("--- accommodation_recommender_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     query = f"Best hostels and stays in {trip.destination} for {trip.month} with {trip.budget_type} budget, including ratings and booking links"
     try:
+        search_start_time = time.time()
         search_results = await sync_to_async(search.results)(query)
+        search_end_time = time.time()
+        print(f"--- accommodation_recommender_agent: Search call took {search_end_time - search_start_time:.2f} seconds ---")
         organic_results = search_results.get("organic", [])
         accommodations = []
         for result in organic_results[:5]:
@@ -388,11 +440,17 @@ async def accommodation_recommender_agent(state):
         
         trip.accommodation_info = [acc.dict() for acc in accommodations]
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- accommodation_recommender_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"accommodation_info": trip.accommodation_info}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- accommodation_recommender_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"accommodation_info": [], "warning": f"Failed to fetch accommodation: {str(e)}"}
 
 async def expense_breakdown_agent(state):
+    print("--- expense_breakdown_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     prompt = f"""
     Based on the following trip details, provide a general expense breakdown.
@@ -400,53 +458,71 @@ async def expense_breakdown_agent(state):
     ... (rest of the prompt)
     """
     try:
+        llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
+        llm_end_time = time.time()
+        print(f"--- expense_breakdown_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
         trip.expense_breakdown = convert_markdown_to_html(result.content.strip())
         await sync_to_async(trip.save)()
+        end_time = time.time()
+        print(f"--- expense_breakdown_agent: END ({end_time - start_time:.2f} seconds) ---")
         return {"expense_breakdown": trip.expense_breakdown}
     except Exception as e:
+        end_time = time.time()
+        print(f"--- expense_breakdown_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         return {"expense_breakdown": "", "warning": str(e)}
 
 async def complete_trip_plan_agent(state):
+    print("--- complete_trip_plan_agent: START ---")
+    start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     prompt = f"""
-    Synthesize all the following information into a comprehensive, single-page, day-by-day trip plan.
-    For each day, detail the plan from morning to evening, including:
-    - **Morning:** Start from your accommodation, suggest breakfast options (with links if available).
-    - **Daytime Activities:** List specific activities with Google Maps links. Each activity should be a separate bullet point, starting with the activity name in bold, followed by a brief description and a Google Maps link if available. Example: - **Eiffel Tower:** Iconic landmark in Paris. [Google Maps](https://maps.app.goo.gl/example)
-    - **Lunch/Dinner:** Suggest dining options (with links if available).
-    - **Evening:** Suggest evening activities or return to accommodation.
-    - **Accommodation:** Clearly state the recommended stay for that night (with booking links if available).
+    Create a day-by-day trip plan based on the following details.
 
-    Integrate weather forecasts and issue warnings if any dangerous weather is predicted for a specific day.
-    Ensure the plan is balanced, considering activities, food, relaxation, and the overall budget type.
-    Provide all relevant links (Google Maps for places, booking links for accommodation) directly within the plan. For activities, food options, and accommodation, also include image and video links if available, formatted as Markdown image `![Description](Image URL)` or video links `[Video URL]`.
+    **Trip Details:**
+    - Destination: {trip.destination}
+    - Month: {trip.month}
+    - Duration: {trip.duration} days
+    - People: {trip.num_people}
+    - Holiday Type: {trip.holiday_type}
+    - Budget: {trip.budget_type}
 
-    Trip Details:
-    Destination: {trip.destination}
-    Month: {trip.month}
-    Duration: {trip.duration} days
-    Number of People: {trip.num_people}
-    Holiday Type: {trip.holiday_type}
-    Budget Type: {trip.budget_type}
+    **Available Information:**
+    - Itinerary: {trip.itinerary if trip.itinerary else 'N/A'}
+    - Accommodation: {trip.accommodation_info if trip.accommodation_info else 'N/A'}
+    - Food & Culture: {trip.food_culture_info if trip.food_culture_info else 'N/A'}
+    - Activities: {trip.activity_suggestions if trip.activity_suggestions else 'N/A'}
+    - Expenses: {trip.expense_breakdown if trip.expense_breakdown else 'N/A'}
 
-    Itinerary: {trip.itinerary if trip.itinerary else 'Not available'}
-    Accommodation Info: {trip.accommodation_info if trip.accommodation_info else 'Not available'}
-    Food & Culture Info: {trip.food_culture_info if trip.food_culture_info else 'Not available'}
-    Activity Suggestions: {trip.activity_suggestions if trip.activity_suggestions else 'Not available'}
-    Expense Breakdown: {trip.expense_breakdown if trip.expense_breakdown else 'Not available'}
-
-    Ensure the plan flows logically, is easy to read, and provides all necessary information for the user to follow.
-    Additionally, enrich the plan with:
-    - **Richer Descriptions:** Provide engaging and descriptive language for recommended places, activities, and food experiences.
-    - **Local Insights & Tips:** Include small cultural notes, best times to visit, local customs, and hidden gems.
-    - **Practical Advice:** Offer transportation tips, safety notes, currency advice, and essential phrases.
-    - **Visual Appeal:** Utilize Markdown formatting (bolding, bullet points, headings) to make the plan easy to read and visually appealing.
+    **Instructions:**
+    For each day, provide a schedule from morning to evening.
+    Include the following for each day:
+    - Morning, Daytime, and Evening activities.
+    - Lunch and Dinner suggestions.
+    - Recommended accommodation for the night.
+    - Use Google Maps links for all locations.
+    - Include image and video links where available.
+    - Mention weather warnings if applicable.
+    - Add local tips and practical advice.
     """
     print(f"--- complete_trip_plan_agent: Starting for trip_id={{trip.id}} ---")
     try:
+        llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
-        result_content = result.content.strip()
+        llm_end_time = time.time()
+        print(f"--- complete_trip_plan_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
+        
+        result_content = ""
+        if isinstance(result.content, list):
+            for part in result.content:
+                if isinstance(part, dict) and 'text' in part:
+                    result_content += part['text']
+                elif isinstance(part, str):
+                    result_content += part
+        else:
+            result_content = result.content
+
+        result_content = result_content.strip()
         print(f"--- complete_trip_plan_agent: Raw LLM output ---\n{{result_content}}\n--- End Raw LLM output ---")
         
         await sync_to_async(Checkpoint.objects.filter(trip=trip).delete)()
@@ -461,44 +537,34 @@ async def complete_trip_plan_agent(state):
             )
             print(f"--- complete_trip_plan_agent: Created fallback checkpoint: Trip to {trip.destination} ---")
         else:
+            checkpoint_counter = 1
             for day_plan in day_patterns:
                 day_match = re.match(r'## (Day \d+:.*?)\n', day_plan)
                 day_name = day_match.group(1).strip() if day_match else "Unknown Day"
                 print(f"--- complete_trip_plan_agent: Processing day: {{day_name}} ---")
                 
-                sections = re.split(r'\n- \*\*(Morning|Daytime Activities|Lunch/Dinner|Evening|Accommodation):\*\*', day_plan)
-                print(f"--- complete_trip_plan_agent: Sections found for {{day_name}}: {{len(sections) // 2}} ---")
-                
-                for i in range(1, len(sections), 2):
-                    section_name = sections[i].strip()
-                    section_content = sections[i+1].strip() if (i+1) < len(sections) else ""
-                    
-                    print(f"--- complete_trip_plan_agent: Processing section: {{section_name}} for {{day_name}} ---")
-                    if section_name == "Daytime Activities":
-                        activity_patterns = re.findall(r'- \*\*(.*?):\*\*(.*?)(?=\n- \*\*|\Z)', section_content, re.DOTALL)
-                        print(f"--- complete_trip_plan_agent: Activities found in '{{section_name}}': {{len(activity_patterns)}} ---")
-                        if activity_patterns:
-                            for activity_name, activity_description in activity_patterns:
-                                if activity_description.strip():
-                                    await sync_to_async(Checkpoint.objects.create)(
-                                        trip=trip, name=f"{day_name} - {activity_name.strip()}",
-                                        description=activity_description.strip()
-                                    )
-                                    print(f"--- complete_trip_plan_agent: Created granular checkpoint: {day_name} - {activity_name.strip()} ---")
-                        elif section_content:
-                            await sync_to_async(Checkpoint.objects.create)(
-                                trip=trip, name=f"{day_name} - {section_name}", description=section_content
-                            )
-                            print(f"--- complete_trip_plan_agent: Created general checkpoint for '{{section_name}}': {day_name} ---")
-                    elif section_content:
+                lines = day_plan.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('##'):
+                        # Treat every non-empty line that is not a header as a checkpoint
+                        activity_name = line.split('.')[0].strip()
+                        if len(activity_name) > 100:
+                            activity_name = activity_name[:100] + '...'
+                        
                         await sync_to_async(Checkpoint.objects.create)(
-                            trip=trip, name=f"{day_name} - {section_name}", description=section_content
+                            trip=trip, name=f"{day_name} - {activity_name}",
+                            description=line
                         )
-                        print(f"--- complete_trip_plan_agent: Created section checkpoint: {day_name} - {section_name} ---")
+                        print(f"checkpoint {checkpoint_counter} - this is created")
+                        checkpoint_counter += 1
 
-        return {"status": "checkpoints_generated"}
+        end_time = time.time()
+        print(f"--- complete_trip_plan_agent: END ({end_time - start_time:.2f} seconds) ---")
+        return {"user_question": ""}
     except Exception as e:
-        print(f"--- complete_trip_plan_agent: An error occurred: {e} ---")
+        end_time = time.time()
+        print(f"--- complete_trip_plan_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         import traceback
         print(traceback.format_exc())
         return {"complete_trip_plan": "", "warning": str(e)}
@@ -515,16 +581,35 @@ workflow.add_node("food_culture_recommender", food_culture_recommender_agent)
 workflow.add_node("accommodation_recommender", accommodation_recommender_agent)
 workflow.add_node("expense_breakdown_node", expense_breakdown_agent)
 
+def join_node(state):
+    # This node doesn't need to do anything, it just serves as a join point
+    # for the parallel branches.
+    return {"user_question": ""}
+
+workflow.add_node("join_node", join_node)
+workflow.add_node("complete_trip_plan", complete_trip_plan_agent)
+
 workflow.set_entry_point("generate_itinerary")
 
 workflow.add_edge("generate_itinerary", "recommend_activities")
-workflow.add_edge("recommend_activities", "fetch_useful_links")
-workflow.add_edge("fetch_useful_links", "weather_forecaster")
-workflow.add_edge("weather_forecaster", "packing_list_generator")
-workflow.add_edge("packing_list_generator", "food_culture_recommender")
-workflow.add_edge("food_culture_recommender", "accommodation_recommender")
-workflow.add_edge("accommodation_recommender", "expense_breakdown_node")
+workflow.add_edge("generate_itinerary", "fetch_useful_links")
+workflow.add_edge("generate_itinerary", "weather_forecaster")
+workflow.add_edge("generate_itinerary", "packing_list_generator")
+workflow.add_edge("generate_itinerary", "food_culture_recommender")
+workflow.add_edge("generate_itinerary", "accommodation_recommender")
+
+workflow.add_edge("recommend_activities", "join_node")
+workflow.add_edge("fetch_useful_links", "join_node")
+workflow.add_edge("weather_forecaster", "join_node")
+workflow.add_edge("packing_list_generator", "join_node")
+workflow.add_edge("food_culture_recommender", "join_node")
+workflow.add_edge("accommodation_recommender", "join_node")
+
+workflow.add_edge("join_node", "complete_trip_plan")
+workflow.add_edge("complete_trip_plan", "expense_breakdown_node")
 workflow.add_edge("expense_breakdown_node", END)
 
 
-graph = workflow.compile()
+from langgraph.checkpoint.memory import MemorySaver
+
+graph = workflow.compile(checkpointer=MemorySaver())

@@ -55,6 +55,7 @@ async def create_trip(request):
             
             inputs = {"trip_id": trip.id}
             try:
+                # Await the completion of the trip generation before redirecting
                 await generate_complete_trip_automatically(inputs)
                 await sync_to_async(trip.refresh_from_db)()
             except Exception as e:
@@ -86,10 +87,8 @@ async def create_paid_trip(request):
             await sync_to_async(trip.save)()
             
             state = {"trip_id": trip.id}
-            await generate_itinerary(state)
+            await generate_complete_trip_automatically(state)
             await sync_to_async(trip.refresh_from_db)()
-
-            
 
             return JsonResponse({'status': 'success', 'redirect_url': reverse('planner:trip_detail', kwargs={'trip_id': trip.id})})
         else:
