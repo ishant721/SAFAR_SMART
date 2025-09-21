@@ -538,26 +538,90 @@ async def complete_trip_plan_agent(state):
             print(f"--- complete_trip_plan_agent: Created fallback checkpoint: Trip to {trip.destination} ---")
         else:
             checkpoint_counter = 1
-            for day_plan in day_patterns:
+            for day_index, day_plan in enumerate(day_patterns, 1):
                 day_match = re.match(r'## (Day \d+:.*?)\n', day_plan)
                 day_name = day_match.group(1).strip() if day_match else "Unknown Day"
                 print(f"--- complete_trip_plan_agent: Processing day: {{day_name}} ---")
                 
                 lines = day_plan.split('\n')
+                activity_order = 1
                 for line in lines:
                     line = line.strip()
                     if line and not line.startswith('##'):
-                        # Treat every non-empty line that is not a header as a checkpoint
-                        activity_name = line.split('.')[0].strip()
-                        if len(activity_name) > 100:
-                            activity_name = activity_name[:100] + '...'
+                        # Parse enhanced checkpoint information
+                        activity_time = None
+                        location = None
+                        tips = None
+                        description = line
+                        
+                        # Extract time (format: HH:MM or H:MM)
+                        time_match = re.search(r'\b(\d{1,2}:\d{2})\b', line)
+                        if time_match:
+                            try:
+                                from datetime import datetime
+                                activity_time = datetime.strptime(time_match.group(1), '%H:%M').time()
+                                # Remove time from description for cleaner display
+                                description = re.sub(r'\b\d{1,2}:\d{2}\b\s*-?\s*', '', line).strip()
+                            except ValueError:
+                                pass
+                        
+                        # Extract location (look for patterns like "Location Name, City" or places with capital letters)
+                        location_patterns = [
+                            r'([A-Z][a-zA-Z\s]+(?:Road|Street|Temple|Palace|Market|Garden|Park|Beach|Fort|Hill|Valley|Lake|Museum|Gallery), [A-Z][a-zA-Z\s]+)',
+                            r'([A-Z][a-zA-Z\s]+(?:Road|Street|Temple|Palace|Market|Garden|Park|Beach|Fort|Hill|Valley|Lake|Museum|Gallery))',
+                            r'Visit\s+([A-Z][a-zA-Z\s,]+)',
+                            r'at\s+([A-Z][a-zA-Z\s,]+)',
+                        ]
+                        
+                        for pattern in location_patterns:
+                            location_match = re.search(pattern, line)
+                            if location_match:
+                                location = location_match.group(1).strip()
+                                # Clean up location
+                                location = re.sub(r'[,\s]+$', '', location)  # Remove trailing commas/spaces
+                                if len(location) > 2:  # Valid location should be more than 2 characters
+                                    break
+                        
+                        # Extract tips (look for advice patterns)
+                        tip_indicators = [
+                            r'[Tt]ip[:.]?\s*(.+?)(?:\.|$)',
+                            r'[Aa]dvice[:.]?\s*(.+?)(?:\.|$)', 
+                            r'[Rr]each early.+',
+                            r'[Bb]est time.+',
+                            r'[Aa]void.+crowd.+',
+                            r'[Bb]ring.+camera.+',
+                            r'[Ww]ear.+shoes.+',
+                        ]
+                        
+                        for pattern in tip_indicators:
+                            tip_match = re.search(pattern, line, re.IGNORECASE)
+                            if tip_match:
+                                if pattern.startswith(r'[Tt]ip') or pattern.startswith(r'[Aa]dvice'):
+                                    tips = tip_match.group(1).strip()
+                                else:
+                                    tips = tip_match.group(0).strip()
+                                break
+                        
+                        # Create activity name from description
+                        activity_name = description.split('.')[0].strip()
+                        if location:
+                            activity_name = location
+                        elif len(activity_name) > 50:
+                            activity_name = activity_name[:50] + '...'
                         
                         await sync_to_async(Checkpoint.objects.create)(
-                            trip=trip, name=f"{day_name} - {activity_name}",
-                            description=line
+                            trip=trip, 
+                            name=activity_name,
+                            description=description,
+                            time=activity_time,
+                            location=location,
+                            tips=tips,
+                            day_number=day_index,
+                            order_in_day=activity_order
                         )
-                        print(f"checkpoint {checkpoint_counter} - this is created")
+                        print(f"checkpoint {checkpoint_counter} - created: {activity_name} at {activity_time or 'No time'}")
                         checkpoint_counter += 1
+                        activity_order += 1
 
         end_time = time.time()
         print(f"--- complete_trip_plan_agent: END ({end_time - start_time:.2f} seconds) ---")

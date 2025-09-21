@@ -40,6 +40,16 @@ class Checkpoint(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
     completed = models.BooleanField(default=False)
+    
+    # Enhanced fields for detailed timeline interface
+    time = models.TimeField(blank=True, null=True, help_text="Activity time (e.g., 09:00)")
+    location = models.CharField(max_length=255, blank=True, null=True, help_text="Specific location for this activity")
+    tips = models.TextField(blank=True, null=True, help_text="Tips and advice for this activity")
+    day_number = models.PositiveIntegerField(default=1, help_text="Day of the trip (1, 2, 3, etc.)")
+    order_in_day = models.PositiveIntegerField(default=1, help_text="Order of activity within the day")
+
+    class Meta:
+        ordering = ['day_number', 'order_in_day', 'time']
 
     def __str__(self):
         return self.name
