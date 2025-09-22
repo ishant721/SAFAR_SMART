@@ -103,6 +103,8 @@ def trip_detail(request, trip_id):
     print(f"--- trip_detail: Found {checkpoints.count()} checkpoints for trip {trip_id} ---")
 
     daily_checkpoints_data = {}
+    checkpoint_weather_data = {}
+    
     for checkpoint in checkpoints:
         day_prefix = f"Day {checkpoint.day_number}"
 
@@ -110,6 +112,12 @@ def trip_detail(request, trip_id):
             daily_checkpoints_data[day_prefix] = {
                 'checkpoints': [], 'completed_count': 0, 'total_count': 0, 'progress_percentage': 0
             }
+        
+        # Fetch weather data for each checkpoint location if available
+        if checkpoint.location and trip.is_started:
+            weather = get_current_weather(checkpoint.location)
+            if weather:
+                checkpoint_weather_data[checkpoint.id] = weather
         
         daily_checkpoints_data[day_prefix]['checkpoints'].append(checkpoint)
         daily_checkpoints_data[day_prefix]['total_count'] += 1
@@ -129,6 +137,7 @@ def trip_detail(request, trip_id):
         'weather_data': weather_data,
         'progress_data': progress_data,
         'daily_checkpoints_data': daily_checkpoints_data,
+        'checkpoint_weather_data': checkpoint_weather_data,
     }
     return render(request, 'planner/trip_detail_interactive.html', context)
 
@@ -289,37 +298,99 @@ def submit_checkpoint_feedback(request, trip_id, checkpoint_id):
 
 # Helper functions for weather and progress tracking
 def get_weather_by_coords(latitude, longitude):
-    """Get current weather for given coordinates"""
-    # In a real application, you would integrate with a weather API (e.g., OpenWeatherMap)
-    # For now, returning dummy data or a simplified version
+    """Get current weather for given coordinates using OpenWeatherMap API"""
+    import requests
+    import os
+    
+    api_key = os.getenv('OPENWEATHERMAP_API_KEY')
+    if not api_key:
+        return None
+    
     try:
-        # Placeholder for actual API call
-        # Example: response = requests.get(f"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid=YOUR_API_KEY&units=metric")
-        # data = response.json()
-        weather_data = {
-            'temperature': 25,
-            'condition': 'Sunny',
-            'humidity': 60,
-            'wind_speed': 5,
-            'location_name': f"Lat: {latitude:.2f}, Lon: {longitude:.2f}"
+        base_url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            'lat': latitude,
+            'lon': longitude,
+            'appid': api_key,
+            'units': 'metric'
         }
-        return weather_data
+        
+        response = requests.get(base_url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            weather_data = {
+                'temperature': round(data['main']['temp'], 1),
+                'condition': data['weather'][0]['description'],
+                'humidity': data['main']['humidity'],
+                'wind_speed': data['wind']['speed'],
+                'visibility': data.get('visibility', 0) / 1000 if data.get('visibility') else 10.0,
+                'icon': data['weather'][0]['icon'],
+                'location_name': data['name'],
+                'country': data['sys']['country']
+            }
+            return weather_data
+        else:
+            return {
+                'temperature': 25,
+                'condition': 'unknown',
+                'humidity': 50,
+                'wind_speed': 2.0,
+                'visibility': 10.0,
+                'icon': '01d',
+                'location_name': f"Lat: {latitude:.2f}, Lon: {longitude:.2f}",
+                'country': 'Unknown'
+            }
     except Exception as e:
         print(f"Error fetching weather by coords: {e}")
         return None
 
 def get_current_weather(destination):
-    """Get current weather for destination"""
+    """Get current weather for destination using OpenWeatherMap API"""
+    import requests
+    import os
+    
+    api_key = os.getenv('OPENWEATHERMAP_API_KEY')
+    if not api_key:
+        return None
+    
     try:
-        weather_data = {
-            'temperature': 25,
-            'condition': 'broken clouds',
-            'humidity': 85,
-            'wind_speed': 1.79,
-            'visibility': 10.0,
+        base_url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {
+            'q': destination,
+            'appid': api_key,
+            'units': 'metric'
         }
-        return weather_data
-    except Exception:
+        
+        response = requests.get(base_url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            weather_data = {
+                'temperature': round(data['main']['temp'], 1),
+                'condition': data['weather'][0]['description'],
+                'humidity': data['main']['humidity'],
+                'wind_speed': data['wind']['speed'],
+                'visibility': data.get('visibility', 0) / 1000 if data.get('visibility') else 10.0,
+                'icon': data['weather'][0]['icon'],
+                'city': data['name'],
+                'country': data['sys']['country']
+            }
+            return weather_data
+        else:
+            # Fallback to dummy data if API fails
+            return {
+                'temperature': 25,
+                'condition': 'unknown',
+                'humidity': 50,
+                'wind_speed': 2.0,
+                'visibility': 10.0,
+                'icon': '01d',
+                'city': destination,
+                'country': 'Unknown'
+            }
+    except Exception as e:
+        print(f"Weather API error: {e}")
         return None
 
 def calculate_trip_progress(trip):
@@ -441,14 +512,19 @@ def download_trip_pdf(request, trip_id):
 
 
 @login_required
-@require_POST
 async def start_journey(request, trip_id):
-    trip = await sync_to_async(Trip.objects.get)(id=trip_id, user=request.user)
-    if not trip.is_started:
-        trip.is_started = True
-        await sync_to_async(trip.save)()
-        return JsonResponse({'status': 'success', 'message': 'Journey started!'})
-    return JsonResponse({'status': 'error', 'message': 'Journey already started.'}, status=400)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'POST method required.'}, status=405)
+    
+    try:
+        trip = await sync_to_async(Trip.objects.get)(id=trip_id, user=request.user)
+        if not trip.is_started:
+            trip.is_started = True
+            await sync_to_async(trip.save)()
+            return JsonResponse({'status': 'success', 'message': 'Journey started!'})
+        return JsonResponse({'status': 'error', 'message': 'Journey already started.'}, status=400)
+    except Trip.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Trip not found.'}, status=404)
 
 @login_required
 def finalize_trip(request, trip_id):

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load form_extras %}
 
 {% block title %}Trip Details - {{ trip.destination }} - SAFAR_SMART{% endblock %}
 
@@ -157,6 +158,27 @@
                                             <div class="checkpoint-tip">
                                                 <i class="bi bi-lightbulb"></i> {{ checkpoint.tips }}
                                             </div>
+                                            {% endif %}
+
+                                            <!-- Weather Information (shown only when journey is started) -->
+                                            {% if trip.is_started %}
+                                                {% with weather_info=checkpoint_weather_data|lookup:checkpoint.id %}
+                                                    {% if weather_info %}
+                                                    <div class="weather-card mt-3 p-3 border rounded" style="background: linear-gradient(135deg, #74b9ff, #0984e3); color: white;">
+                                                        <div class="d-flex align-items-center">
+                                                            {% if weather_info.icon %}
+                                                            <img src="https://openweathermap.org/img/wn/{{ weather_info.icon }}@2x.png" 
+                                                                 alt="Weather icon" class="weather-icon me-3" style="width: 50px; height: 50px;">
+                                                            {% endif %}
+                                                            <div>
+                                                                <h6 class="mb-1">🌤️ Current Weather - {{ checkpoint.location|default:"Unknown" }}</h6>
+                                                                <p class="mb-1"><strong>{{ weather_info.temperature }}°C</strong> - {{ weather_info.condition|title }}</p>
+                                                                <small>💧 {{ weather_info.humidity }}% humidity • 💨 {{ weather_info.wind_speed }} m/s wind</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {% endif %}
+                                                {% endwith %}
                                             {% endif %}
 
                                             <!-- Interactive Checkpoint Controls -->
@@ -909,7 +931,7 @@ function startJourney(tripId) {
         return;
     }
 
-    fetch(`/planner/start_journey/${tripId}/`, {
+    fetch(`/planner/trip/${tripId}/start_journey/`, {
         method: 'POST',
         headers: {
             'X-CSRFToken': csrfToken
