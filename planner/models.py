@@ -22,6 +22,7 @@ class Trip(models.Model):
     complete_trip_plan = models.TextField(blank=True, null=True)
     is_finalized = models.BooleanField(default=False)
     trip_status = models.CharField(max_length=20, default='draft')
+    is_started = models.BooleanField(default=False)
     
     def __str__(self):
         return f"Trip to {self.destination} for {self.user.username}"
@@ -55,8 +56,15 @@ class Checkpoint(models.Model):
         return self.name
 
 class Feedback(models.Model):
+    LIKE = 1
+    DISLIKE = 2
+    RATING_CHOICES = (
+        (LIKE, 'Like'),
+        (DISLIKE, 'Dislike'),
+    )
     checkpoint = models.ForeignKey(Checkpoint, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.IntegerField(choices=RATING_CHOICES, default=LIKE)
     feedback = models.TextField()
 
     def __str__(self):

@@ -99,12 +99,12 @@ async def create_paid_trip(request):
 @login_required
 def trip_detail(request, trip_id):
     trip = get_object_or_404(Trip, id=trip_id, user=request.user)
-    checkpoints = trip.checkpoint_set.all().order_by('id')
+    checkpoints = trip.checkpoint_set.all().order_by('day_number', 'order_in_day')
+    print(f"--- trip_detail: Found {checkpoints.count()} checkpoints for trip {trip_id} ---")
 
     daily_checkpoints_data = {}
     for checkpoint in checkpoints:
-        day_prefix_match = re.match(r'(Day \d+)', checkpoint.name)
-        day_prefix = day_prefix_match.group(1) if day_prefix_match else "Other Checkpoints"
+        day_prefix = f"Day {checkpoint.day_number}"
 
         if day_prefix not in daily_checkpoints_data:
             daily_checkpoints_data[day_prefix] = {
@@ -119,6 +119,7 @@ def trip_detail(request, trip_id):
     for day_data in daily_checkpoints_data.values():
         if day_data['total_count'] > 0:
             day_data['progress_percentage'] = round((day_data['completed_count'] / day_data['total_count']) * 100, 2)
+    print(f"--- trip_detail: daily_checkpoints_data: {daily_checkpoints_data} ---")
 
     weather_data = get_current_weather(trip.destination)
     progress_data = calculate_trip_progress(trip)
@@ -238,24 +239,75 @@ def mark_checkpoint_complete(request, trip_id, checkpoint_id):
 
 @login_required
 @require_POST
+def get_realtime_weather(request):
+    latitude = request.POST.get('latitude')
+    longitude = request.POST.get('longitude')
+
+    if not latitude or not longitude:
+        return JsonResponse({'status': 'error', 'message': 'Latitude and longitude are required.'}, status=400)
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except ValueError:
+        return JsonResponse({'status': 'error', 'message': 'Invalid latitude or longitude.'}, status=400)
+
+    weather_data = get_weather_by_coords(latitude, longitude)
+
+    if weather_data:
+        return JsonResponse({'status': 'success', 'weather': weather_data})
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Could not fetch weather data.'}, status=500)
+
+@login_required
+@require_POST
 def submit_checkpoint_feedback(request, trip_id, checkpoint_id):
     checkpoint = get_object_or_404(Checkpoint, id=checkpoint_id, trip__user=request.user, trip_id=trip_id)
     try:
         data = json.loads(request.body)
         feedback_text = data.get('feedback')
+        rating = data.get('rating')
+
+        defaults = {}
         if feedback_text is not None:
+            defaults['feedback'] = feedback_text
+        if rating is not None:
+            defaults['rating'] = rating
+
+        if defaults:
             feedback, created = Feedback.objects.update_or_create(
                 checkpoint=checkpoint,
                 user=request.user,
-                defaults={'feedback': feedback_text}
+                defaults=defaults
             )
-            return JsonResponse({'status': 'success', 'feedback': feedback_text})
+            return JsonResponse({'status': 'success', 'feedback': feedback.feedback, 'rating': feedback.rating})
         else:
-            return JsonResponse({'status': 'error', 'message': 'Feedback text is required'}, status=400)
+            return JsonResponse({'status': 'error', 'message': 'No feedback or rating provided'}, status=400)
+
     except json.JSONDecodeError:
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
 
 # Helper functions for weather and progress tracking
+def get_weather_by_coords(latitude, longitude):
+    """Get current weather for given coordinates"""
+    # In a real application, you would integrate with a weather API (e.g., OpenWeatherMap)
+    # For now, returning dummy data or a simplified version
+    try:
+        # Placeholder for actual API call
+        # Example: response = requests.get(f"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid=YOUR_API_KEY&units=metric")
+        # data = response.json()
+        weather_data = {
+            'temperature': 25,
+            'condition': 'Sunny',
+            'humidity': 60,
+            'wind_speed': 5,
+            'location_name': f"Lat: {latitude:.2f}, Lon: {longitude:.2f}"
+        }
+        return weather_data
+    except Exception as e:
+        print(f"Error fetching weather by coords: {e}")
+        return None
+
 def get_current_weather(destination):
     """Get current weather for destination"""
     try:
@@ -387,6 +439,16 @@ def download_trip_pdf(request, trip_id):
     response.write(pdf.output(dest='S'))
     return response
 
+
+@login_required
+@require_POST
+async def start_journey(request, trip_id):
+    trip = await sync_to_async(Trip.objects.get)(id=trip_id, user=request.user)
+    if not trip.is_started:
+        trip.is_started = True
+        await sync_to_async(trip.save)()
+        return JsonResponse({'status': 'success', 'message': 'Journey started!'})
+    return JsonResponse({'status': 'error', 'message': 'Journey already started.'}, status=400)
 
 @login_required
 def finalize_trip(request, trip_id):

@@ -18,7 +18,7 @@ from asgiref.sync import sync_to_async
 load_dotenv()
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=os.getenv("GOOGLE_API_KEY"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize GoogleSerperAPIWrapper
 search = GoogleSerperAPIWrapper(serper_api_key=os.getenv("SERPER_API_KEY"))
@@ -53,6 +53,13 @@ class AccommodationOption(BaseModel):
     image_url: str = ""
     video_url: str = ""
 
+class Place(BaseModel):
+    day: int
+    places: list[str]
+
+class PlaceList(BaseModel):
+    days: list[Place]
+
 # Define state
 class GraphState(TypedDict):
     trip_id: int
@@ -65,6 +72,7 @@ class GraphState(TypedDict):
     food_culture_info: FoodCultureInfo
     accommodation_info: list[AccommodationOption]
     expense_breakdown: str
+    complete_trip_plan: str
     
     chat_history: Annotated[list[dict], "List of question-response pairs"]
     user_question: str
@@ -170,6 +178,7 @@ async def weather_forecaster_agent(state):
     prompt = f"""
     Provide a weather forecast for {trip.destination} in {trip.month}.
     Include temperature, precipitation, and travel advice.
+    Do not repeat any section headers or content.
     """
     try:
         llm_start_time = time.time()
@@ -194,6 +203,7 @@ async def packing_list_generator_agent(state):
     Generate a packing list for a {trip.holiday_type} trip to {trip.destination} in {trip.month} for {trip.duration} days.
     Use bullet points for each item.
     Base the list on the weather and trip type.
+    Do not repeat any section headers or content.
     """
     try:
         llm_start_time = time.time()
@@ -233,6 +243,7 @@ async def food_culture_recommender_agent(state):
         
         cultural_prompt = f"""
         Provide a list of important cultural norms and etiquette tips for a trip to {trip.destination}.
+        Do not repeat any section headers or content.
         """
         llm_start_time = time.time()
         cultural_info_result = await sync_to_async(llm.invoke)([HumanMessage(content=cultural_prompt)])
@@ -455,14 +466,34 @@ async def expense_breakdown_agent(state):
     prompt = f"""
     Based on the following trip details, provide a general expense breakdown.
     Assume average costs for {trip.destination} in {trip.month} for a {trip.budget_type} budget.
-    ... (rest of the prompt)
+    Consider categories like:
+    - Accommodation
+    - Flights/Transportation
+    - Food & Dining
+    - Activities & Sightseeing
+    - Miscellaneous (shopping, emergencies)
+
+    Provide a breakdown per person and total for {trip.num_people} people.
+    Use a clear, readable format, preferably markdown tables or bullet points.
+    Do not repeat any section headers or content.
     """
     try:
         llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
         llm_end_time = time.time()
         print(f"--- expense_breakdown_agent: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
-        trip.expense_breakdown = convert_markdown_to_html(result.content.strip())
+
+        result_content = ""
+        if isinstance(result.content, list):
+            for part in result.content:
+                if isinstance(part, dict) and 'text' in part:
+                    result_content += part['text']
+                elif isinstance(part, str):
+                    result_content += part
+        else:
+            result_content = result.content
+
+        trip.expense_breakdown = convert_markdown_to_html(result_content.strip())
         await sync_to_async(trip.save)()
         end_time = time.time()
         print(f"--- expense_breakdown_agent: END ({end_time - start_time:.2f} seconds) ---")
@@ -487,12 +518,7 @@ async def complete_trip_plan_agent(state):
     - Holiday Type: {trip.holiday_type}
     - Budget: {trip.budget_type}
 
-    **Available Information:**
-    - Itinerary: {trip.itinerary if trip.itinerary else 'N/A'}
-    - Accommodation: {trip.accommodation_info if trip.accommodation_info else 'N/A'}
-    - Food & Culture: {trip.food_culture_info if trip.food_culture_info else 'N/A'}
-    - Activities: {trip.activity_suggestions if trip.activity_suggestions else 'N/A'}
-    - Expenses: {trip.expense_breakdown if trip.expense_breakdown else 'N/A'}
+
 
     **Instructions:**
     For each day, provide a schedule from morning to evening.
@@ -504,6 +530,7 @@ async def complete_trip_plan_agent(state):
     - Include image and video links where available.
     - Mention weather warnings if applicable.
     - Add local tips and practical advice.
+    - For EVERY specific place to visit (like a temple, museum, palace, park, zoo, dam, fort, etc.), you MUST enclose its name in <place> tags. For example: <place>Gwalior Fort</place>, <place>Gwalior Zoo</place>, <place>Tighra Dam</place>. Do NOT tag restaurants, hotels, or general activities as places.
     """
     print(f"--- complete_trip_plan_agent: Starting for trip_id={{trip.id}} ---")
     try:
@@ -524,114 +551,135 @@ async def complete_trip_plan_agent(state):
 
         result_content = result_content.strip()
         print(f"--- complete_trip_plan_agent: Raw LLM output ---\n{{result_content}}\n--- End Raw LLM output ---")
-        
-        await sync_to_async(Checkpoint.objects.filter(trip=trip).delete)()
-        print(f"--- complete_trip_plan_agent: Cleared existing checkpoints for trip_id={{trip.id}} ---")
 
-        day_patterns = re.findall(r'(## Day \d+:.*?)(?=## Day \d+:|\Z)', result_content, re.DOTALL)
-        print(f"--- complete_trip_plan_agent: Day patterns found: {{len(day_patterns)}} ---")
-        if not day_patterns:
-            print("--- complete_trip_plan_agent: No day patterns found. Creating single fallback checkpoint. ---")
-            await sync_to_async(Checkpoint.objects.create)(
-                trip=trip, name=f"Trip to {trip.destination}", description=result_content
-            )
-            print(f"--- complete_trip_plan_agent: Created fallback checkpoint: Trip to {trip.destination} ---")
-        else:
-            checkpoint_counter = 1
-            for day_index, day_plan in enumerate(day_patterns, 1):
-                day_match = re.match(r'## (Day \d+:.*?)\n', day_plan)
-                day_name = day_match.group(1).strip() if day_match else "Unknown Day"
-                print(f"--- complete_trip_plan_agent: Processing day: {{day_name}} ---")
-                
-                lines = day_plan.split('\n')
-                activity_order = 1
-                for line in lines:
-                    line = line.strip()
-                    if line and not line.startswith('##'):
-                        # Parse enhanced checkpoint information
-                        activity_time = None
-                        location = None
-                        tips = None
-                        description = line
-                        
-                        # Extract time (format: HH:MM or H:MM)
-                        time_match = re.search(r'\b(\d{1,2}:\d{2})\b', line)
-                        if time_match:
-                            try:
-                                from datetime import datetime
-                                activity_time = datetime.strptime(time_match.group(1), '%H:%M').time()
-                                # Remove time from description for cleaner display
-                                description = re.sub(r'\b\d{1,2}:\d{2}\b\s*-?\s*', '', line).strip()
-                            except ValueError:
-                                pass
-                        
-                        # Extract location (look for patterns like "Location Name, City" or places with capital letters)
-                        location_patterns = [
-                            r'([A-Z][a-zA-Z\s]+(?:Road|Street|Temple|Palace|Market|Garden|Park|Beach|Fort|Hill|Valley|Lake|Museum|Gallery), [A-Z][a-zA-Z\s]+)',
-                            r'([A-Z][a-zA-Z\s]+(?:Road|Street|Temple|Palace|Market|Garden|Park|Beach|Fort|Hill|Valley|Lake|Museum|Gallery))',
-                            r'Visit\s+([A-Z][a-zA-Z\s,]+)',
-                            r'at\s+([A-Z][a-zA-Z\s,]+)',
-                        ]
-                        
-                        for pattern in location_patterns:
-                            location_match = re.search(pattern, line)
-                            if location_match:
-                                location = location_match.group(1).strip()
-                                # Clean up location
-                                location = re.sub(r'[,\s]+$', '', location)  # Remove trailing commas/spaces
-                                if len(location) > 2:  # Valid location should be more than 2 characters
-                                    break
-                        
-                        # Extract tips (look for advice patterns)
-                        tip_indicators = [
-                            r'[Tt]ip[:.]?\s*(.+?)(?:\.|$)',
-                            r'[Aa]dvice[:.]?\s*(.+?)(?:\.|$)', 
-                            r'[Rr]each early.+',
-                            r'[Bb]est time.+',
-                            r'[Aa]void.+crowd.+',
-                            r'[Bb]ring.+camera.+',
-                            r'[Ww]ear.+shoes.+',
-                        ]
-                        
-                        for pattern in tip_indicators:
-                            tip_match = re.search(pattern, line, re.IGNORECASE)
-                            if tip_match:
-                                if pattern.startswith(r'[Tt]ip') or pattern.startswith(r'[Aa]dvice'):
-                                    tips = tip_match.group(1).strip()
-                                else:
-                                    tips = tip_match.group(0).strip()
-                                break
-                        
-                        # Create activity name from description
-                        activity_name = description.split('.')[0].strip()
-                        if location:
-                            activity_name = location
-                        elif len(activity_name) > 50:
-                            activity_name = activity_name[:50] + '...'
-                        
-                        await sync_to_async(Checkpoint.objects.create)(
-                            trip=trip, 
-                            name=activity_name,
-                            description=description,
-                            time=activity_time,
-                            location=location,
-                            tips=tips,
-                            day_number=day_index,
-                            order_in_day=activity_order
-                        )
-                        print(f"checkpoint {checkpoint_counter} - created: {activity_name} at {activity_time or 'No time'}")
-                        checkpoint_counter += 1
-                        activity_order += 1
+        if not result_content:
+            print("--- complete_trip_plan_agent: LLM output is empty. Returning warning. ---")
+            return {"complete_trip_plan": "", "warning": "LLM returned an empty plan."}
 
         end_time = time.time()
         print(f"--- complete_trip_plan_agent: END ({end_time - start_time:.2f} seconds) ---")
-        return {"user_question": ""}
+        return {"complete_trip_plan": result_content}
     except Exception as e:
         end_time = time.time()
         print(f"--- complete_trip_plan_agent: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
         import traceback
         print(traceback.format_exc())
         return {"complete_trip_plan": "", "warning": str(e)}
+
+
+async def extract_places_agent(state):
+    print("--- extract_places_agent: START ---")
+    trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
+    
+    complete_trip_plan = state.get('complete_trip_plan')
+    if not complete_trip_plan:
+        print("--- extract_places_agent: No complete trip plan found in state. Skipping. ---")
+        return {}
+    print(f"--- extract_places_agent: Complete trip plan received: {complete_trip_plan} ---")
+
+    prompt = f"""
+    Your task is to act as a place name extractor from a travel itinerary.
+    From the following itinerary, extract ONLY the names of the specific places to visit. These are typically proper nouns and refer to locations like temples, museums, palaces, forts, parks, specific markets, or historical sites. You MUST extract any text enclosed within <place> tags as a place. Do NOT extract the <place> tags themselves, only the content within them.
+
+
+    **CRITICAL INSTRUCTIONS:**
+    1.  **DO NOT** extract general activities like "shopping", "relaxing", "leisurely walk".
+    2.  **DO NOT** extract categories or headers like "Morning", "Afternoon", "Daytime", "Accommodation", "Transportation", "Lunch", "Dinner", "Breakfast".
+    3.  **DO NOT** extract restaurant or hotel names.
+    4.  Only extract the name of the place itself, not the surrounding text. For example, from "visit the magnificent **Gwalior Fort**", you should only extract "Gwalior Fort".
+
+    Return the result as a JSON string that strictly adheres to the following Pydantic schema:
+    ```json
+    {{
+        "days": [
+            {{"day": 1, "places": ["Gwalior Fort", "Man Singh Palace"]}},
+            {{"day": 2, "places": ["Jai Vilas Palace", "Scindia Museum"]}}
+        ]
+    }}
+    ```
+    Where "days" is a list of objects, each with an integer "day" field and a list of strings "places" field.
+    Ensure the output is a valid JSON string, without any additional text or markdown formatting outside the JSON.
+
+    Itinerary:
+    ---
+    {complete_trip_plan}
+    ---
+    """
+
+    llm_result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
+    json_string = llm_result.content.strip()
+    # Extract JSON from markdown code block if present
+    if json_string.startswith('```json') and json_string.endswith('```'):
+        json_string = json_string[len('```json'):-len('```')].strip()
+    elif json_string.startswith('```') and json_string.endswith('```'):
+        json_string = json_string[len('```'):-len('```')].strip()
+
+    try:
+        result_data = json.loads(json_string)
+        # Validate the structure against the Pydantic model
+        validated_result = PlaceList(**result_data)
+    except json.JSONDecodeError as e:
+        print(f"--- extract_places_agent: JSON Decode Error: {e} ---")
+        print(f"--- extract_places_agent: Raw LLM output: {json_string} ---")
+        return {"warning": f"Failed to parse LLM output as JSON: {e}"}
+    except Exception as e:
+        print(f"--- extract_places_agent: Pydantic Validation Error: {e} ---")
+        print(f"--- extract_places_agent: Raw LLM output: {json_string} ---")
+        return {"warning": f"LLM output did not match expected schema: {e}"}
+
+    await sync_to_async(Checkpoint.objects.filter(trip=trip).delete)()
+
+    non_place_keywords = [
+        'morning', 'afternoon', 'evening', 'daytime', 
+        'accommodation', 'transportation', 
+        'lunch', 'dinner', 'breakfast', 
+        'hotel', 'restaurant', 'airport', 'station',
+        'budget', 'cost', 'price', 'expense',
+        'activity', 'suggestion', 'recommendation',
+        'local tip', 'weather alert'
+    ]
+
+    for day_data in validated_result.days:
+        day_number = day_data.day
+        activity_order = 1
+        for place_name in day_data.places:
+            
+            cleaned_place_name = place_name.strip(" *:- ")
+            lower_cleaned_place_name = cleaned_place_name.lower()
+
+            if not cleaned_place_name:
+                continue
+
+            # Stricter filtering
+            is_non_place = False
+            for keyword in non_place_keywords:
+                if keyword in lower_cleaned_place_name:
+                    is_non_place = True
+                    break
+            if is_non_place:
+                continue
+
+            if any(c in cleaned_place_name for c in '¥$€£'):
+                continue
+
+            # Check for uniqueness within the day
+            existing_checkpoints_for_day = await sync_to_async(
+                lambda: Checkpoint.objects.filter(trip=trip, day_number=day_number, name=cleaned_place_name).exists()
+            )()
+            if not existing_checkpoints_for_day:
+                await sync_to_async(Checkpoint.objects.create)(
+                    trip=trip,
+                    name=cleaned_place_name,
+                    description=f"Visit {cleaned_place_name}",
+                    day_number=day_number,
+                    order_in_day=activity_order
+                )
+                activity_order += 1
+            else:
+                print(f"--- extract_places_agent: Skipping duplicate checkpoint for {cleaned_place_name} on Day {day_number} ---")
+    
+    print("--- extract_places_agent: END ---")
+    return {"complete_trip_plan": state["complete_trip_plan"]}
 
 
 # Define the graph
@@ -651,7 +699,9 @@ def join_node(state):
     return {"user_question": ""}
 
 workflow.add_node("join_node", join_node)
-workflow.add_node("complete_trip_plan", complete_trip_plan_agent)
+workflow.add_node("generate_complete_trip_plan", complete_trip_plan_agent)
+workflow.add_node("extract_places", extract_places_agent)
+
 
 workflow.set_entry_point("generate_itinerary")
 
@@ -669,8 +719,9 @@ workflow.add_edge("packing_list_generator", "join_node")
 workflow.add_edge("food_culture_recommender", "join_node")
 workflow.add_edge("accommodation_recommender", "join_node")
 
-workflow.add_edge("join_node", "complete_trip_plan")
-workflow.add_edge("complete_trip_plan", "expense_breakdown_node")
+workflow.add_edge("join_node", "generate_complete_trip_plan")
+workflow.add_edge("generate_complete_trip_plan", "extract_places")
+workflow.add_edge("extract_places", "expense_breakdown_node")
 workflow.add_edge("expense_breakdown_node", END)
 
 

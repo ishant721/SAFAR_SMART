@@ -19,6 +19,15 @@
             <a href="{% url 'planner:dashboard' %}" class="btn btn-light btn-lg">
                 <i class="bi bi-arrow-left"></i> Back to Dashboard
             </a>
+            {% if not trip.is_started %}
+            <button class="btn btn-success btn-lg ms-2" onclick="startJourney({{ trip.id }})">
+                <i class="bi bi-play-circle"></i> Start Journey
+            </button>
+            {% else %}
+            <button class="btn btn-secondary btn-lg ms-2" disabled>
+                <i class="bi bi-check-circle"></i> Journey Started
+            </button>
+            {% endif %}
         </div>
     </div>
 </section>
@@ -94,6 +103,9 @@
                 <a href="{% url 'planner:download_trip_pdf' trip.id %}" class="btn btn-primary">
                     📄 Download PDF
                 </a>
+                <button class="btn btn-info" onclick="regenerateTripPlan()">
+                    🔄 Regenerate Plan
+                </button>
                 <button class="btn btn-secondary" onclick="switchToSection('itinerary')">
                     ← Back
                 </button>
@@ -103,11 +115,11 @@
             <div id="journeyTimeline">
                 {% if daily_checkpoints_data %}
                     <div class="timeline-container">
-                    {% for day_data in daily_checkpoints_data %}
+                    {% for day_prefix, day_data in daily_checkpoints_data.items %}
                         <div class="timeline-day-container">
                             <div class="journey-day">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h4 class="mb-1">🌍 {{ day_data.day_prefix }}</h4>
+                                    <h4 class="mb-1">🌍 {{ day_prefix }}</h4>
                                     <span class="badge bg-light text-dark">{{ day_data.completed_count }}/{{ day_data.total_count }} completed</span>
                                 </div>
                                 <div class="day-progress-bar">
@@ -148,20 +160,26 @@
                                             </div>
                                             {% endif %}
 
-                                            <!-- Experience Notes -->
-                                            <div class="mb-3">
-                                                <label for="feedback-text-{{ checkpoint.id }}" class="form-label">Add your experience notes...</label>
-                                                <textarea class="form-control experience-notes" id="feedback-text-{{ checkpoint.id }}" rows="2"
-                                                    onblur="submitCheckpointFeedback({{ checkpoint.id }})"
-                                                    placeholder="Share your thoughts about this activity..."
-                                                >{% if checkpoint.feedback_set.first %}{{ checkpoint.feedback_set.first.feedback }}{% endif %}</textarea>
+                                            <!-- Interactive Checkpoint Controls -->
+                                            <div class="checkpoint-actions">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="checkpoint-toggle-{{ checkpoint.id }}" 
+                                                        {% if checkpoint.completed %}checked{% endif %} 
+                                                        onchange="toggleCheckpointCompletion({{ checkpoint.id }})">
+                                                    <label class="form-check-label" for="checkpoint-toggle-{{ checkpoint.id }}">Mark as Visited</label>
+                                                </div>
+                                                <div class="feedback-actions">
+                                                    <button class="btn btn-sm btn-outline-success feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 1)">👍</button>
+                                                    <button class="btn btn-sm btn-outline-danger feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 2)">👎</button>
+                                                </div>
                                             </div>
 
-                                            <!-- Completion Button -->
-                                            <div class="checkpoint-actions">
-                                                <button class="complete-btn {% if checkpoint.completed %}completed{% endif %}" onclick="toggleCheckpointCompletion({{ checkpoint.id }})">
-                                                    {% if checkpoint.completed %}✓ Complete{% else %}Complete{% endif %}
-                                                </button>
+                                            <!-- Experience Notes -->
+                                            <div class="mt-3">
+                                                <textarea class="form-control experience-notes" id="feedback-text-{{ checkpoint.id }}" rows="2"
+                                                    placeholder="Add a note about your experience..."
+                                                >{% if checkpoint.feedback_set.first %}{{ checkpoint.feedback_set.first.feedback }}{% endif %}</textarea>
+                                                <button class="btn btn-sm btn-primary mt-2" onclick="submitCheckpointFeedback({{ checkpoint.id }})">Save Notes</button>
                                             </div>
                                         </div>
                                     </div>
@@ -214,6 +232,16 @@
 
         <div id="weather" class="content-section tab-content" style="display: none;">
             <h2 class="section-title"><i class="bi bi-cloud-sun"></i> Weather Forecast</h2>
+            <div id="realtime-weather-display" class="card-modern mb-4" style="display: none;">
+                <div class="card-body-modern">
+                    <h5 class="card-title"><i class="bi bi-geo-alt"></i> Real-time Weather <span id="realtime-weather-location"></span></h5>
+                    <p class="card-text mb-1">Temperature: <span id="realtime-weather-temp"></span>°C</p>
+                    <p class="card-text mb-1">Condition: <span id="realtime-weather-condition"></span></p>
+                    <p class="card-text mb-1">Humidity: <span id="realtime-weather-humidity"></span>%</p>
+                    <p class="card-text">Wind Speed: <span id="realtime-weather-wind"></span> m/s</p>
+                    <small class="text-muted">Updated: <span id="realtime-weather-time"></span></small>
+                </div>
+            </div>
             <div id="weather-content">
             {% if trip.weather_forecast %}
                 <div class="rendered-content">{{ trip.weather_forecast|safe }}</div>
@@ -877,7 +905,118 @@ function removeTypingIndicator() {
     }
 }
 
-// Functions for checkpoint interaction (can be kept as they are)
+function startJourney(tripId) {
+    if (!confirm('Are you sure you want to start this journey?')) {
+        return;
+    }
+
+    fetch(`/planner/start_journey/${tripId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showNotification('Journey started successfully!', 'success');
+            location.reload();
+        } else {
+            showNotification('Error starting journey: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error starting journey:', error);
+        showNotification('An error occurred while starting the journey.', 'error');
+    });
+}
+
+// Real-time weather functionality
+function getRealtimeWeather() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+
+            fetch('/planner/get_realtime_weather/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken
+                },
+                body: `latitude=${latitude}&longitude=${longitude}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const weather = data.weather;
+                    document.getElementById('realtime-weather-location').innerText = weather.location_name;
+                    document.getElementById('realtime-weather-temp').innerText = weather.temperature;
+                    document.getElementById('realtime-weather-condition').innerText = weather.condition;
+                    document.getElementById('realtime-weather-humidity').innerText = weather.humidity;
+                    document.getElementById('realtime-weather-wind').innerText = weather.wind_speed;
+                    document.getElementById('realtime-weather-time').innerText = new Date().toLocaleTimeString();
+                    document.getElementById('realtime-weather-display').style.display = 'block';
+                } else {
+                    console.error('Error fetching real-time weather:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching real-time weather:', error);
+            });
+        }, error => {
+            console.warn('Geolocation error:', error.message);
+            // Optionally, show a message to the user that location could not be retrieved
+        });
+    } else {
+        console.warn('Geolocation is not supported by this browser.');
+    }
+}
+
+// Call getRealtimeWeather if the journey has started
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing code ...
+    if ({{ trip.is_started|lower }}) { // trip.is_started is a boolean, convert to JS boolean
+        getRealtimeWeather();
+        // Optionally, refresh weather every few minutes
+        setInterval(getRealtimeWeather, 5 * 60 * 1000); // Every 5 minutes
+    }
+});
+
+function regenerateTripPlan() {
+    if (!confirm('Are you sure you want to regenerate the entire trip plan? This will replace the existing plan.')) {
+        return;
+    }
+
+    showNotification('Regenerating your trip plan... This may take a moment.', 'info');
+
+    fetch(`/planner/process_trip/${tripId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken
+        },
+        body: 'agent_name=generate_complete_trip'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (data.warning) {
+                showNotification('Trip plan regenerated with warnings: ' + data.warning, 'warning');
+            } else {
+                showNotification('Trip plan regenerated successfully!', 'success');
+            }
+            location.reload();
+        } else {
+            showNotification('Error regenerating trip plan: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('An error occurred while regenerating the trip plan.', 'error');
+    });
+}
+
 function toggleCheckpointCompletion(checkpointId) {
     const checkbox = document.getElementById(`checkpoint-toggle-${checkpointId}`);
     const isCompleted = checkbox.checked;
@@ -893,20 +1032,28 @@ function toggleCheckpointCompletion(checkpointId) {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            // ... (rest of the function)
+            showNotification(`Checkpoint marked as ${isCompleted ? 'complete' : 'incomplete'}.`, 'success');
             location.reload(); // Reload to update progress bars
         } else {
-            // ...
+            showNotification('Error updating checkpoint: ' + data.message, 'error');
+            checkbox.checked = !isCompleted; // Revert checkbox on error
         }
     })
     .catch(error => {
-        // ...
+        console.error('Error:', error);
+        showNotification('An error occurred while updating the checkpoint.', 'error');
+        checkbox.checked = !isCompleted; // Revert checkbox on error
     });
 }
 
-function submitCheckpointFeedback(checkpointId) {
+function submitCheckpointFeedback(checkpointId, rating = null) {
     const feedbackTextarea = document.getElementById(`feedback-text-${checkpointId}`);
     const feedback = feedbackTextarea.value;
+
+    let payload = { feedback: feedback };
+    if (rating) {
+        payload.rating = rating;
+    }
 
     fetch(`/planner/trip/${tripId}/checkpoint/${checkpointId}/feedback/`, {
         method: 'POST',
@@ -914,7 +1061,7 @@ function submitCheckpointFeedback(checkpointId) {
             'Content-Type': 'application/json',
             'X-CSRFToken': csrfToken
         },
-        body: JSON.stringify({ feedback: feedback })
+        body: JSON.stringify(payload)
     })
     .then(response => response.json())
     .then(data => {
