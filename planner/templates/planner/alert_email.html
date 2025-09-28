@@ -1,0 +1,26 @@
+<!-- planner/templates/planner/alert_email.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Travel Alert for Your Trip</title>
+</head>
+<body>
+    <p>Dear {{ trip.user.username }},</p>
+    
+    <p>This is an important travel alert regarding your upcoming trip to <strong>{{ trip.destination }}</strong>.</p>
+    
+    <ul>
+        {% for alert in alert_message %}
+            <li>{{ alert }}</li>
+        {% endfor %}
+    </ul>
+    
+    <p>Please review your travel plans and take necessary precautions.</p>
+    
+    <p>You can view your trip details here: <a href="{{ protocol }}://{{ domain }}{% url 'planner:trip_detail' trip.id %}">View Trip</a></p>
+    
+    <p>Safe travels!</p>
+    <p>The SAFAR_SMART Team</p>
+</body>
+</html>

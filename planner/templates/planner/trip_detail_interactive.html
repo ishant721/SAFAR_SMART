@@ -51,16 +51,13 @@
     <div class="col-lg-9 fade-in-up-delay-2">
         <div id="itinerary" class="content-section tab-content active">
             <h2 class="section-title"><i class="bi bi-map"></i> Your Complete Itinerary</h2>
-            {% if trip.itinerary %}
-                <div class="rendered-content">{{ trip.itinerary|safe }}</div>
-            {% else %}
-                <div class="loading-state">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Generating content...</p>
+            <div id="interactiveItinerary" class="itinerary-container"></div>
+            <div id="itineraryLoadingState" class="loading-state">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-            {% endif %}
+                <p class="mt-2">Generating content...</p>
+            </div>
         </div>
 
         <div id="journey-progress" class="content-section tab-content" style="display: none;">
@@ -103,9 +100,24 @@
                 <a href="{% url 'planner:download_trip_pdf' trip.id %}" class="btn btn-primary">
                     📄 Download PDF
                 </a>
+                {% if not trip.has_been_reviewed %}
+                {% if not trip.has_been_reviewed %}
                 <button class="btn btn-info" onclick="regenerateTripPlan()">
                     🔄 Regenerate Plan
                 </button>
+                {% else %}
+                <button class="btn btn-info" disabled>
+                    🔄 Plan Reviewed
+                </button>
+                {% endif %}
+                <button class="btn btn-success" onclick="submitTripReview({{ trip.id }})">
+                    ✅ Submit Review
+                </button>
+                {% else %}
+                <button class="btn btn-info" onclick="regenerateTripPlan()" disabled>
+                    🔄 Regenerate Plan
+                </button>
+                {% endif %}
                 <button class="btn btn-secondary" onclick="switchToSection('itinerary')">
                     ← Back
                 </button>
@@ -143,10 +155,17 @@
                                             <div class="checkpoint-location">
                                                 {% if checkpoint.location %}
                                                     <i class="bi bi-geo-alt"></i> {{ checkpoint.location }}
+                                                    <button onclick="toggleMap({{ checkpoint.id }}, '{{ checkpoint.location|escapejs }}')" class="btn btn-sm btn-outline-primary ms-2" title="View on map">
+                                                        <i class="bi bi-map"></i>
+                                                    </button>
                                                 {% else %}
                                                     {{ checkpoint.name }}
+                                                    <button onclick="toggleMap({{ checkpoint.id }}, '{{ checkpoint.name|escapejs }}')" class="btn btn-sm btn-outline-primary ms-2" title="View on map">
+                                                        <i class="bi bi-map"></i>
+                                                    </button>
                                                 {% endif %}
                                             </div>
+                                            <div id="map-container-{{ checkpoint.id }}" class="map-container mt-3" style="display: none;"></div>
 
                                             <!-- Activity Description -->
                                             <div class="checkpoint-description mb-3">
@@ -186,12 +205,21 @@
                                                 <div class="form-check form-switch">
                                                     <input class="form-check-input" type="checkbox" id="checkpoint-toggle-{{ checkpoint.id }}" 
                                                         {% if checkpoint.completed %}checked{% endif %} 
-                                                        onchange="toggleCheckpointCompletion({{ checkpoint.id }})">
+                                                        onchange="toggleCheckpointCompletion({{ checkpoint.id }})"
+                                                        {% if checkpoint.feedback_submitted %}disabled{% endif %}>
                                                     <label class="form-check-label" for="checkpoint-toggle-{{ checkpoint.id }}">Mark as Visited</label>
                                                 </div>
+                                                <div class="d-flex gap-2">
+                                                    {% if checkpoint.image_url %}
+                                                        <a href="{{ checkpoint.image_url }}" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-image"></i> Photo</a>
+                                                    {% endif %}
+                                                    {% if checkpoint.video_url %}
+                                                        <a href="{{ checkpoint.video_url }}" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-play-circle"></i> Video</a>
+                                                    {% endif %}
+                                                </div>
                                                 <div class="feedback-actions">
-                                                    <button class="btn btn-sm btn-outline-success feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 1)">👍</button>
-                                                    <button class="btn btn-sm btn-outline-danger feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 2)">👎</button>
+                                                    <button class="btn btn-sm btn-outline-success feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 1)" {% if checkpoint.feedback_submitted %}disabled{% endif %}>👍</button>
+                                                    <button class="btn btn-sm btn-outline-danger feedback-btn" onclick="submitCheckpointFeedback({{ checkpoint.id }}, 2)" {% if checkpoint.feedback_submitted %}disabled{% endif %}>👎</button>
                                                 </div>
                                             </div>
 
@@ -199,8 +227,9 @@
                                             <div class="mt-3">
                                                 <textarea class="form-control experience-notes" id="feedback-text-{{ checkpoint.id }}" rows="2"
                                                     placeholder="Add a note about your experience..."
+                                                    {% if checkpoint.feedback_submitted %}disabled{% endif %}
                                                 >{% if checkpoint.feedback_set.first %}{{ checkpoint.feedback_set.first.feedback }}{% endif %}</textarea>
-                                                <button class="btn btn-sm btn-primary mt-2" onclick="submitCheckpointFeedback({{ checkpoint.id }})">Save Notes</button>
+                                                <button class="btn btn-sm btn-primary mt-2" onclick="submitCheckpointFeedback({{ checkpoint.id }})" {% if checkpoint.feedback_submitted %}disabled{% endif %}>Save Notes</button>
                                             </div>
                                         </div>
                                     </div>
@@ -646,6 +675,21 @@
     animation: pulse 2s infinite;
 }
 
+.map-container {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.map-container {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.map-container {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
     70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
@@ -814,8 +858,23 @@ async function generateSectionContent(sectionId, agentName, contentKey) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Automatically generate content for empty sections
-    generateSectionContent('itinerary', 'generate_itinerary', 'itinerary');
+    // Render interactive itinerary if data exists
+    const rawItinerary = `{{ trip.itinerary|escapejs }}`;
+    if (rawItinerary && rawItinerary !== 'None' && rawItinerary.trim() !== '') {
+        try {
+            const itineraryData = JSON.parse(rawItinerary);
+            renderInteractiveItinerary(itineraryData);
+        } catch (e) {
+            console.error("Error parsing itinerary JSON:", e);
+            document.getElementById('interactiveItinerary').innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-triangle"></i><h5>Error loading itinerary.</h5><p>The itinerary data is malformed.</p></div>`;
+        }
+    } else {
+        document.getElementById('interactiveItinerary').innerHTML = `<div class="empty-state"><i class="bi bi-map"></i><h5>No itinerary available</h5><p>Generate your complete trip plan first to see your detailed itinerary!</p></div>`;
+    }
+    document.getElementById('itineraryLoadingState').style.display = 'none'; // Hide loading state if it exists
+
+    // Automatically generate content for empty sections (excluding itinerary now)
+        generateSectionContent('itinerary', 'generate_itinerary', 'itinerary');
     generateSectionContent('activities', 'recommend_activities', 'activity_suggestions');
     generateSectionContent('weather', 'weather_forecaster', 'weather_forecast');
     generateSectionContent('packing', 'packing_list_generator', 'packing_list');
@@ -1004,6 +1063,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function toggleMap(checkpointId, locationName) {
+    const mapContainer = document.getElementById(`map-container-${checkpointId}`);
+    if (mapContainer.style.display === 'none') {
+        const iframe = document.createElement('iframe');
+        iframe.width = '100%';
+        iframe.height = '300';
+        iframe.frameBorder = '0';
+        iframe.style.border = '0';
+        iframe.src = `https://maps.google.com/maps?q=${encodeURIComponent(locationName)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+        iframe.allowFullscreen = true;
+        mapContainer.innerHTML = '';
+        mapContainer.appendChild(iframe);
+        mapContainer.style.display = 'block';
+    } else {
+        mapContainer.style.display = 'none';
+        mapContainer.innerHTML = '';
+    }
+}
+
 function regenerateTripPlan() {
     if (!confirm('Are you sure you want to regenerate the entire trip plan? This will replace the existing plan.')) {
         return;
@@ -1095,6 +1173,32 @@ function submitCheckpointFeedback(checkpointId, rating = null) {
     .catch(error => {
         console.error('Error:', error);
         showNotification('An error occurred while saving feedback.', 'error');
+    });
+}
+
+function submitTripReview(tripId) {
+    if (!confirm('Are you sure you want to mark this trip as reviewed? You will not be able to regenerate the plan after this.')) {
+        return;
+    }
+
+    fetch(`/planner/trip/${tripId}/submit_review/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showNotification('Trip marked as reviewed successfully!', 'success');
+            location.reload();
+        } else {
+            showNotification('Error marking trip as reviewed: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('An error occurred while marking the trip as reviewed.', 'error');
     });
 }
 

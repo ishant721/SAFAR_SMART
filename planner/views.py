@@ -138,6 +138,7 @@ def trip_detail(request, trip_id):
         'progress_data': progress_data,
         'daily_checkpoints_data': daily_checkpoints_data,
         'checkpoint_weather_data': checkpoint_weather_data,
+        'has_been_reviewed': trip.has_been_reviewed,
     }
     return render(request, 'planner/trip_detail_interactive.html', context)
 
@@ -210,9 +211,21 @@ async def chat_with_agent(request, trip_id):
     if request.method == 'POST':
         user_question = request.POST.get('user_question')
         
+        # Load chat history
+        chat_history_messages = await sync_to_async(list)(
+            ChatMessage.objects.filter(trip=trip).order_by('created_at')
+        )
+        
+        chat_history_for_state = []
+        for msg in chat_history_messages:
+            chat_history_for_state.append({"role": "user", "content": msg.question})
+            chat_history_for_state.append({"role": "assistant", "content": msg.response})
+
         state = {
-            "trip_id": trip.id, "user_question": user_question,
-            "chat_history": [], "chat_response": "",
+            "trip_id": trip.id,
+            "user_question": user_question,
+            "chat_history": chat_history_for_state,
+            "chat_response": "",
         }
 
         try:
@@ -240,6 +253,7 @@ def mark_checkpoint_complete(request, trip_id, checkpoint_id):
         if isinstance(completed, bool):
             checkpoint.completed = completed
             checkpoint.save()
+
             return JsonResponse({'status': 'success', 'completed': completed})
         else:
             return JsonResponse({'status': 'error', 'message': 'Invalid value for completed'}, status=400)
@@ -289,6 +303,9 @@ def submit_checkpoint_feedback(request, trip_id, checkpoint_id):
                 user=request.user,
                 defaults=defaults
             )
+            checkpoint.feedback_submitted = True
+            checkpoint.save()
+
             return JsonResponse({'status': 'success', 'feedback': feedback.feedback, 'rating': feedback.rating})
         else:
             return JsonResponse({'status': 'error', 'message': 'No feedback or rating provided'}, status=400)

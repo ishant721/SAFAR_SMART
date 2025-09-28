@@ -247,6 +247,69 @@ function removeTypingIndicator() {
     }
 }
 
+function renderInteractiveItinerary(itineraryData) {
+    const itineraryContainer = document.getElementById('interactiveItinerary');
+    const itineraryLoadingState = document.getElementById('itineraryLoadingState');
+    if (!itineraryContainer) return;
+
+    if (itineraryLoadingState) {
+        itineraryLoadingState.style.display = 'none'; // Hide loading state
+    }
+    itineraryContainer.innerHTML = ''; // Clear previous content
+
+    if (!itineraryData || !itineraryData.days || itineraryData.days.length === 0) {
+        itineraryContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="bi bi-map"></i>
+                <h5>No itinerary available</h5>
+                <p>Generate your complete trip plan first to see your detailed itinerary!</p>
+            </div>
+        `;
+        return;
+    }
+
+    itineraryData.days.forEach(day => {
+        const dayCard = document.createElement('div');
+        dayCard.className = 'card-modern mb-4';
+
+        let activitiesHtml = '';
+        day.activities.forEach(activity => {
+            activitiesHtml += `
+                <div class="activity-item mb-3 p-3 border rounded">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-clock me-2"></i>${activity.time}</h6>
+                        ${activity.location ? `<span class="badge bg-info text-white"><i class="bi bi-geo-alt me-1"></i>${activity.location}</span>` : ''}
+                    </div>
+                    <p class="mb-2">${activity.description}</p>
+                    ${activity.tips ? `<p class="small text-muted mb-2"><i class="bi bi-lightbulb me-2"></i>Tips: ${activity.tips}</p>` : ''}
+                    <div class="d-flex gap-2 flex-wrap">
+                        ${activity.google_maps_link ? `<a href="${activity.google_maps_link}" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-map me-1"></i>Map</a>` : ''}
+                        ${activity.image_url ? `<a href="${activity.image_url}" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-image me-1"></i>Image</a>` : ''}
+                        ${activity.video_url ? `<a href="${activity.video_url}" target="_blank" class="btn btn-sm btn-outline-warning"><i class="bi bi-play-circle me-1"></i>Video</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        dayCard.innerHTML = `
+            <div class="card-header-modern d-flex justify-content-between align-items-center" id="headingDay${day.day_number}">
+                <h5 class="mb-0 text-white">
+                    Day ${day.day_number}: ${day.theme || 'Activities'}
+                </h5>
+                <button class="btn btn-light btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDay${day.day_number}" aria-expanded="true" aria-controls="collapseDay${day.day_number}">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </div>
+            <div id="collapseDay${day.day_number}" class="collapse show" aria-labelledby="headingDay${day.day_number}">
+                <div class="card-body-modern">
+                    ${activitiesHtml}
+                </div>
+            </div>
+        `;
+        itineraryContainer.appendChild(dayCard);
+    });
+}
+
 // Initialize chat when page loads
 document.addEventListener('DOMContentLoaded', function() {
     initializeChat();

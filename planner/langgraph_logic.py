@@ -1,24 +1,20 @@
-from typing import TypedDict, Annotated
+from .models import Trip, ChatMessage, Checkpoint
+from typing import TypedDict, Annotated, Optional
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.utilities import GoogleSerperAPIWrapper
-from dotenv import load_dotenv
 import os
 from .models import Trip, ChatMessage, Checkpoint
-import json
-from .utils import convert_markdown_to_html
-import re
-from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 import asyncio
 from asgiref.sync import sync_to_async
-
-# Load environment variables
-load_dotenv()
-
+from .rag_logic import hyde_search_trips
+import json
+from .utils import convert_markdown_to_html
+from langchain_core.tools import tool
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=os.getenv("GOOGLE_API_KEY"))
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize GoogleSerperAPIWrapper
 search = GoogleSerperAPIWrapper(serper_api_key=os.getenv("SERPER_API_KEY"))
@@ -60,6 +56,23 @@ class Place(BaseModel):
 class PlaceList(BaseModel):
     days: list[Place]
 
+class ItineraryActivity(BaseModel):
+    time: str
+    description: str
+    location: Optional[str] = None
+    tips: Optional[str] = None
+    google_maps_link: Optional[str] = None
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+
+class ItineraryDay(BaseModel):
+    day_number: int
+    theme: str = None
+    activities: list[ItineraryActivity]
+
+class StructuredItinerary(BaseModel):
+    days: list[ItineraryDay]
+
 # Define state
 class GraphState(TypedDict):
     trip_id: int
@@ -85,9 +98,14 @@ async def generate_itinerary(state):
     print("--- generate_itinerary: START ---")
     start_time = time.time()
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
-    preferences_text = f"Destination: {trip.destination}\nMonth: {trip.month}\nDuration: {trip.duration} days\nPeople: {trip.num_people}\nType: {trip.holiday_type}\nBudget: {trip.budget_type}\nComments: {trip.comments}"
-    prompt = f"""
-    Create a detailed itinerary based on these preferences:
+
+    # 1. Generate multiple search queries
+    query_generation_prompt = f"""
+    Based on the following user preferences for a trip, generate 3 diverse and specific search queries that would be useful for finding information to create a detailed itinerary.
+    The queries should cover different aspects of the trip, such as activities, dining, and local culture.
+    Return the queries as a JSON list of strings.
+
+    User Preferences:
     - Destination: {trip.destination}
     - Month: {trip.month}
     - Duration: {trip.duration} days
@@ -96,21 +114,143 @@ async def generate_itinerary(state):
     - Budget: {trip.budget_type}
     - Comments: {trip.comments}
 
-    For each day, include dining options and downtime.
+    Example Output:
+    ["best restaurants in {trip.destination} for {trip.budget_type} budget", "unique cultural experiences in {trip.destination}", "day trips from {trip.destination}"]
     """
     try:
+        print("--- generate_itinerary: Generating search queries... ---")
+        query_generation_result = await sync_to_async(llm.invoke)([HumanMessage(content=query_generation_prompt)])
+        json_string = query_generation_result.content.strip()
+        # Extract JSON from markdown code block if present
+        if json_string.startswith('```json') and json_string.endswith('```'):
+            json_string = json_string[len('```json'):-len('```')].strip()
+        elif json_string.startswith('```') and json_string.endswith('```'):
+            json_string = json_string[len('```'):-len('```')].strip()
+        queries = json.loads(json_string)
+        print(f"--- generate_itinerary: Generated queries: {queries} ---")
+    except Exception as e:
+        print(f"--- generate_itinerary: Query generation failed: {e} ---")
+        queries = [f"best things to do in {trip.destination} in {trip.month}"]
+
+    # 2. Execute all queries and combine the results
+    search_context = ""
+    print("--- generate_itinerary: Executing search queries... ---")
+    for query in queries:
+        try:
+            search_results = await sync_to_async(search.results)(query)
+            search_context += "\n".join([r['snippet'] for r in search_results.get('organic', [])[:3]])
+            search_context += "\n"
+        except Exception as e:
+            print(f"--- generate_itinerary: Serper API Error for query '{query}': {e} ---")
+            search_context += f"Could not retrieve information for query: {query}\n"
+    print(f"--- generate_itinerary: Combined search context:\n{search_context} ---")
+
+
+    # 3. Build the prompt with the combined context
+    prompt = f"""
+    You are a world-class travel planner. Create a detailed, day-by-day itinerary in JSON format based on the user's preferences and the provided context.
+    The itinerary should be comprehensive, covering activities, dining, and practical tips.
+
+    User Preferences:
+    - Destination: {trip.destination}
+    - Month: {trip.month}
+    - Duration: {trip.duration} days
+    - People: {trip.num_people}
+    - Type: {trip.holiday_type}
+    - Budget: {trip.budget_type}
+    - Comments: {trip.comments}
+
+    Up-to-date Context from the Web:
+    {search_context}
+
+    For each day, include a theme and a list of activities. Each activity should have:
+    - 'time': A time slot (e.g., "Morning", "9:00 AM - 12:00 PM", "Evening").
+    - 'description': A detailed description of the activity.
+    - 'location': (Optional) The specific location name (e.g., "Eiffel Tower").
+    - 'tips': (Optional) Any useful tips for the activity.
+    - 'google_maps_link': (Optional) A Google Maps URL for the location.
+    - 'image_url': (Optional) A URL for an image related to the activity.
+    - 'video_url': (Optional) A URL for a video related to the activity.
+
+    Ensure the JSON output strictly conforms to the following Pydantic schema:
+    ```json
+    {{
+        "days": [
+            {{
+                "day_number": 1,
+                "theme": "Arrival and City Exploration",
+                "activities": [
+                    {{
+                        "time": "Morning",
+                        "description": "Arrive at {trip.destination} and check into your accommodation.",
+                        "location": "Your Hotel",
+                        "tips": "Pre-book airport transfer for convenience.",
+                        "google_maps_link": "https://maps.google.com/?q=Your+Hotel",
+                        "image_url": "https://example.com/hotel.jpg",
+                        "video_url": null
+                    }},
+                    {{
+                        "time": "Afternoon",
+                        "description": "Explore the historic city center, visiting local markets and landmarks.",
+                        "location": "City Center",
+                        "tips": "Wear comfortable shoes.",
+                        "google_maps_link": "https://maps.google.com/?q=City+Center",
+                        "image_url": null,
+                        "video_url": null
+                    }}
+                ]
+            }},
+            {{
+                "day_number": 2,
+                "theme": "Cultural Immersion",
+                "activities": [
+                    {{
+                        "time": "Morning",
+                        "description": "Visit a famous local landmark, such as the Grand Museum.",
+                        "location": "Grand Museum",
+                        "tips": "Arrive early to avoid crowds.",
+                        "google_maps_link": "https://maps.google.com/?q=Grand+Museum",
+                        "image_url": "https://example.com/grand_museum.jpg",
+                        "video_url": null
+                    }}
+                ]
+            }}
+        ]
+    }}
+    ```
+    Provide only the JSON output, no additional text or markdown outside the JSON block.
+    """
+    try:
+        print("--- generate_itinerary: Generating itinerary with LLM... ---")
         llm_start_time = time.time()
         result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
         llm_end_time = time.time()
         print(f"--- generate_itinerary: LLM call took {llm_end_time - llm_start_time:.2f} seconds ---")
-        trip.itinerary = convert_markdown_to_html(result.content.strip())
+        
+        json_string = result.content.strip()
+        # Extract JSON from markdown code block if present
+        if json_string.startswith('```json') and json_string.endswith('```'):
+            json_string = json_string[len('```json'):-len('```')].strip()
+        elif json_string.startswith('```') and json_string.endswith('```'):
+            json_string = json_string[len('```'):-len('```')].strip()
+
+        print(f"--- generate_itinerary: Raw LLM output:\n{json_string} ---")
+        parsed_itinerary = json.loads(json_string)
+        validated_itinerary = StructuredItinerary(**parsed_itinerary)
+        
+        trip.itinerary = json.dumps(validated_itinerary.dict()) # Store as JSON string
         await sync_to_async(trip.save)()
         end_time = time.time()
         print(f"--- generate_itinerary: END ({end_time - start_time:.2f} seconds) ---")
         return {"itinerary": trip.itinerary}
+    except json.JSONDecodeError as e:
+        print(f"--- generate_itinerary: JSON Decode Error: {e} ---")
+        print(f"--- generate_itinerary: Raw LLM output: {json_string} ---")
+        return {"itinerary": "", "warning": f"Failed to parse LLM output as JSON: {e}"}
     except Exception as e:
-        end_time = time.time()
-        print(f"--- generate_itinerary: ERROR ({end_time - start_time:.2f} seconds) - {e} ---")
+        print(f"--- generate_itinerary: ERROR ({time.time() - start_time:.2f} seconds) - {e} ---")
+        import traceback
+        print(traceback.format_exc())
         return {"itinerary": "", "warning": str(e)}
 
 async def recommend_activities_agent(state):
@@ -280,102 +420,129 @@ async def generate_complete_trip_automatically(state):
         return {"complete_generation": False, "warning": f"Failed to generate complete trip: {str(e)}"}
 
 @tool
-async def update_activities(trip_id: int, instruction: str = None) -> str:
+async def update_activities(instruction: str = None, trip_id: int = None) -> str:
     """
-    Updates the activity suggestions for a trip based on the provided instruction.
+    Updates the activity suggestions for the current trip based on an instruction.
     Use this tool when the user asks to modify or get new activity suggestions.
     The instruction should describe the type of activities the user is looking for.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await recommend_activities_agent(state)
     if result.get("warning"): return f"Failed to update activities: {result['warning']}"
     return "Activity suggestions updated successfully."
 
 @tool
-async def update_useful_links(trip_id: int, instruction: str = None) -> str:
+async def update_useful_links(instruction: str = None, trip_id: int = None) -> str:
     """
-    Fetches and updates useful links for a trip based on the provided instruction.
+    Fetches and updates useful links for the current trip based on an instruction.
     Use this tool when the user asks for more useful links or specific types of links.
     The instruction should describe the type of links the user is looking for.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await fetch_useful_links_agent(state)
     if result.get("warning"): return f"Failed to update useful links: {result['warning']}"
     return "Useful links updated successfully."
 
 @tool
-async def update_weather_forecast(trip_id: int, instruction: str = None) -> str:
+async def update_weather_forecast(instruction: str = None, trip_id: int = None) -> str:
     """
-    Fetches and updates the weather forecast for a trip based on the provided instruction.
+    Fetches and updates the weather forecast for the current trip based on an instruction.
     Use this tool when the user asks for updated weather information or a more detailed forecast.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await weather_forecaster_agent(state)
     if result.get("warning"): return f"Failed to update weather forecast: {result['warning']}"
     return "Weather forecast updated successfully."
 
 @tool
-async def update_packing_list(trip_id: int, instruction: str = None) -> str:
+async def update_packing_list(instruction: str = None, trip_id: int = None) -> str:
     """
-    Generates and updates the packing list for a trip based on the provided instruction.
+    Generates and updates the packing list for the current trip based on an instruction.
     Use this tool when the user asks to modify or get a new packing list.
     The instruction should describe any specific requirements for the packing list.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await packing_list_generator_agent(state)
     if result.get("warning"): return f"Failed to update packing list: {result['warning']}"
     return "Packing list updated successfully."
 
 @tool
-async def update_food_culture_info(trip_id: int, instruction: str = None) -> str:
+async def update_food_culture_info(instruction: str = None, trip_id: int = None) -> str:
     """
-    Fetches and updates food and culture information for a trip based on the provided instruction.
+    Fetches and updates food and culture information for the current trip based on an instruction.
     Use this tool when the user asks for more food options, cultural tips, or specific dietary information.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await food_culture_recommender_agent(state)
     if result.get("warning"): return f"Failed to update food and culture information: {result['warning']}"
     return "Food and culture information updated successfully."
 
 @tool
-async def update_accommodation_info(trip_id: int, instruction: str = None) -> str:
+async def update_accommodation_info(instruction: str = None, trip_id: int = None) -> str:
     """
-    Fetches and updates accommodation recommendations for a trip based on the provided instruction.
+    Fetches and updates accommodation recommendations for the current trip based on an instruction.
     Use this tool when the user asks for different types of accommodation or specific booking information.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await accommodation_recommender_agent(state)
     if result.get("warning"): return f"Failed to update accommodation information: {result['warning']}"
     return "Accommodation information updated successfully."
 
 @tool
-async def update_expense_breakdown(trip_id: int, instruction: str = None) -> str:
+async def update_expense_breakdown(instruction: str = None, trip_id: int = None) -> str:
     """
-    Generates and updates the expense breakdown for a trip based on the provided instruction.
+    Generates and updates the expense breakdown for the current trip based on an instruction.
     Use this tool when the user asks for a revised expense breakdown or a breakdown for a specific budget.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await expense_breakdown_agent(state)
     if result.get("warning"): return f"Failed to update expense breakdown: {result['warning']}"
     return "Expense breakdown updated successfully."
 
 @tool
-async def update_complete_trip_plan(trip_id: int, instruction: str = None) -> str:
+async def update_complete_trip_plan(instruction: str = None, trip_id: int = None) -> str:
     """
-    Generates and updates the complete trip plan based on the provided instruction.
+    Generates and updates the complete trip plan for the current trip based on an instruction.
     This tool should be used when the user asks for a comprehensive regeneration or significant modification of the entire trip plan.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await complete_trip_plan_agent(state)
     if result.get("warning"): return f"Failed to update complete trip plan: {result['warning']}"
     return "Complete trip plan updated successfully."
 
 @tool
-async def generate_full_trip_plan(trip_id: int, instruction: str = None) -> str:
+async def generate_full_trip_plan(instruction: str = None, trip_id: int = None) -> str:
     """
-    Generates a complete trip plan from scratch, including itinerary, activities, and all other details.
+    Generates a complete trip plan from scratch for the current trip, including itinerary, activities, and all other details.
     Use this tool when the user asks to generate a new trip plan or to start over.
+    The trip ID is handled automatically. Do not ask the user for it.
     """
+    if not trip_id:
+        return "Error: trip_id was not provided to the tool."
     state = {"trip_id": trip_id, "user_question": instruction or ""}
     result = await generate_complete_trip_automatically(state)
     if result.get("warning"):
@@ -391,14 +558,48 @@ tools = [
 llm_with_tools = llm.bind_tools(tools)
 
 async def chat_agent(state):
+    print("--- chat_agent: START ---")
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     user_question = state['user_question']
+    chat_history = state.get('chat_history', [])
+    print(f"--- chat_agent: User question: {user_question} ---")
 
-    messages = [HumanMessage(content=user_question)]
+    # RAG with HyDE: Search for relevant trip plans
+    print("--- chat_agent: Starting RAG with HyDE search... ---")
+    user_id = await sync_to_async(lambda: trip.user.id)()
+    retrieved_docs = await hyde_search_trips(user_question, user_id=user_id)
+    context = "\n".join(retrieved_docs)
+    print(f"--- chat_agent: Retrieved context:\n{context} ---")
 
+
+    # Build the prompt with context
+    prompt_with_context = f"""
+    You are a helpful travel assistant. Use the following context to answer the user's question.
+    If the context doesn't contain the answer, say that you don't have enough information.
+
+    Context:
+    {context}
+
+    Conversation History:
+    """
+    
+    messages = []
+    for msg in chat_history:
+        if msg['role'] == 'user':
+            messages.append(HumanMessage(content=msg['content']))
+        elif msg['role'] == 'assistant':
+            messages.append(AIMessage(content=msg['content']))
+
+    # Add the system prompt with context to the beginning of the messages
+    messages.insert(0, HumanMessage(content=prompt_with_context))
+            
+    messages.append(HumanMessage(content=user_question))
+
+    print("--- chat_agent: Calling LLM with tools... ---")
     response = await sync_to_async(llm_with_tools.invoke)(messages)
 
     if response.tool_calls:
+        print(f"--- chat_agent: LLM decided to use tools: {response.tool_calls} ---")
         tool_outputs = []
         for tool_call in response.tool_calls:
             selected_tool = next((t for t in tools if t.name == tool_call.name), None)
@@ -406,23 +607,31 @@ async def chat_agent(state):
                 try:
                     tool_args = tool_call.args
                     tool_args['trip_id'] = trip.id
+                    print(f"--- chat_agent: Executing tool '{tool_call.name}' with args: {tool_args} ---")
                     tool_output = await selected_tool.invoke(tool_args)
+                    print(f"--- chat_agent: Tool '{tool_call.name}' output: {tool_output} ---")
                     tool_outputs.append(f"Tool {tool_call.name} executed: {tool_output}")
                 except Exception as e:
+                    print(f"--- chat_agent: Error executing tool {tool_call.name}: {str(e)} ---")
                     tool_outputs.append(f"Error executing tool {tool_call.name}: {str(e)}")
             else:
+                print(f"--- chat_agent: Tool {tool_call.name} not found. ---")
                 tool_outputs.append(f"Tool {tool_call.name} not found.")
         
         messages.append(response)
         messages.append(AIMessage(content=str(tool_outputs)))
+        print("--- chat_agent: Calling LLM again with tool results... ---")
         final_response = await sync_to_async(llm.invoke)(messages)
         chat_response_text = final_response.content
     else:
+        print("--- chat_agent: LLM answered directly. ---")
         chat_response_text = response.content
 
+    print(f"--- chat_agent: Final response:\n{chat_response_text} ---")
     chat_message = await sync_to_async(ChatMessage.objects.create)(
         trip=trip, question=user_question, response=convert_markdown_to_html(chat_response_text)
     )
+    print("--- chat_agent: END ---")
     return {"chat_response": convert_markdown_to_html(chat_response_text)}
 
 async def accommodation_recommender_agent(state):
@@ -526,8 +735,6 @@ async def complete_trip_plan_agent(state):
     - Morning, Daytime, and Evening activities.
     - Lunch and Dinner suggestions.
     - Recommended accommodation for the night.
-    - Use Google Maps links for all locations.
-    - Include image and video links where available.
     - Mention weather warnings if applicable.
     - Add local tips and practical advice.
     - For EVERY specific place to visit (like a temple, museum, palace, park, zoo, dam, fort, etc.), you MUST enclose its name in <place> tags. For example: <place>Gwalior Fort</place>, <place>Gwalior Zoo</place>, <place>Tighra Dam</place>. Do NOT tag restaurants, hotels, or general activities as places.
@@ -571,115 +778,43 @@ async def extract_places_agent(state):
     print("--- extract_places_agent: START ---")
     trip = await sync_to_async(Trip.objects.get)(id=state['trip_id'])
     
-    complete_trip_plan = state.get('complete_trip_plan')
-    if not complete_trip_plan:
-        print("--- extract_places_agent: No complete trip plan found in state. Skipping. ---")
-        return {}
-    print(f"--- extract_places_agent: Complete trip plan received: {complete_trip_plan} ---")
-
-    prompt = f"""
-    Your task is to act as a place name extractor from a travel itinerary.
-    From the following itinerary, extract ONLY the names of the specific places to visit. These are typically proper nouns and refer to locations like temples, museums, palaces, forts, parks, specific markets, or historical sites. You MUST extract any text enclosed within <place> tags as a place. Do NOT extract the <place> tags themselves, only the content within them.
-
-
-    **CRITICAL INSTRUCTIONS:**
-    1.  **DO NOT** extract general activities like "shopping", "relaxing", "leisurely walk".
-    2.  **DO NOT** extract categories or headers like "Morning", "Afternoon", "Daytime", "Accommodation", "Transportation", "Lunch", "Dinner", "Breakfast".
-    3.  **DO NOT** extract restaurant or hotel names.
-    4.  Only extract the name of the place itself, not the surrounding text. For example, from "visit the magnificent **Gwalior Fort**", you should only extract "Gwalior Fort".
-
-    Return the result as a JSON string that strictly adheres to the following Pydantic schema:
-    ```json
-    {{
-        "days": [
-            {{"day": 1, "places": ["Gwalior Fort", "Man Singh Palace"]}},
-            {{"day": 2, "places": ["Jai Vilas Palace", "Scindia Museum"]}}
-        ]
-    }}
-    ```
-    Where "days" is a list of objects, each with an integer "day" field and a list of strings "places" field.
-    Ensure the output is a valid JSON string, without any additional text or markdown formatting outside the JSON.
-
-    Itinerary:
-    ---
-    {complete_trip_plan}
-    ---
-    """
-
-    llm_result = await sync_to_async(llm.invoke)([HumanMessage(content=prompt)])
-    json_string = llm_result.content.strip()
-    # Extract JSON from markdown code block if present
-    if json_string.startswith('```json') and json_string.endswith('```'):
-        json_string = json_string[len('```json'):-len('```')].strip()
-    elif json_string.startswith('```') and json_string.endswith('```'):
-        json_string = json_string[len('```'):-len('```')].strip()
+    itinerary_json = trip.itinerary
+    if not itinerary_json:
+        print("--- extract_places_agent: No itinerary found in trip. Skipping. ---")
+        return {"trip_id": state['trip_id']}
 
     try:
-        result_data = json.loads(json_string)
-        # Validate the structure against the Pydantic model
-        validated_result = PlaceList(**result_data)
-    except json.JSONDecodeError as e:
-        print(f"--- extract_places_agent: JSON Decode Error: {e} ---")
-        print(f"--- extract_places_agent: Raw LLM output: {json_string} ---")
-        return {"warning": f"Failed to parse LLM output as JSON: {e}"}
-    except Exception as e:
-        print(f"--- extract_places_agent: Pydantic Validation Error: {e} ---")
-        print(f"--- extract_places_agent: Raw LLM output: {json_string} ---")
-        return {"warning": f"LLM output did not match expected schema: {e}"}
+        itinerary_data = json.loads(itinerary_json)
+        validated_itinerary = StructuredItinerary(**itinerary_data)
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"--- extract_places_agent: Error parsing or validating itinerary JSON: {e} ---")
+        return {"warning": f"Failed to process itinerary data: {e}", "trip_id": state['trip_id']}
 
     await sync_to_async(Checkpoint.objects.filter(trip=trip).delete)()
 
-    non_place_keywords = [
-        'morning', 'afternoon', 'evening', 'daytime', 
-        'accommodation', 'transportation', 
-        'lunch', 'dinner', 'breakfast', 
-        'hotel', 'restaurant', 'airport', 'station',
-        'budget', 'cost', 'price', 'expense',
-        'activity', 'suggestion', 'recommendation',
-        'local tip', 'weather alert'
-    ]
-
-    for day_data in validated_result.days:
-        day_number = day_data.day
+    for day in validated_itinerary.days:
         activity_order = 1
-        for place_name in day_data.places:
-            
-            cleaned_place_name = place_name.strip(" *:- ")
-            lower_cleaned_place_name = cleaned_place_name.lower()
-
-            if not cleaned_place_name:
+        for activity in day.activities:
+            # Basic filtering to avoid creating checkpoints for generic activities
+            if "arrive" in activity.description.lower() or "depart" in activity.description.lower() or "check into" in activity.description.lower():
                 continue
 
-            # Stricter filtering
-            is_non_place = False
-            for keyword in non_place_keywords:
-                if keyword in lower_cleaned_place_name:
-                    is_non_place = True
-                    break
-            if is_non_place:
-                continue
-
-            if any(c in cleaned_place_name for c in '¥$€£'):
-                continue
-
-            # Check for uniqueness within the day
-            existing_checkpoints_for_day = await sync_to_async(
-                lambda: Checkpoint.objects.filter(trip=trip, day_number=day_number, name=cleaned_place_name).exists()
-            )()
-            if not existing_checkpoints_for_day:
-                await sync_to_async(Checkpoint.objects.create)(
-                    trip=trip,
-                    name=cleaned_place_name,
-                    description=f"Visit {cleaned_place_name}",
-                    day_number=day_number,
-                    order_in_day=activity_order
-                )
-                activity_order += 1
-            else:
-                print(f"--- extract_places_agent: Skipping duplicate checkpoint for {cleaned_place_name} on Day {day_number} ---")
+            await sync_to_async(Checkpoint.objects.create)(
+                trip=trip,
+                name=activity.location or activity.description[:100],
+                description=activity.description,
+                day_number=day.day_number,
+                order_in_day=activity_order,
+                time=None,  # The ItineraryActivity.time is a string like "Morning", not a TimeField
+                location=activity.location,
+                tips=activity.tips,
+                image_url=activity.image_url,
+                video_url=activity.video_url,
+            )
+            activity_order += 1
     
     print("--- extract_places_agent: END ---")
-    return {"complete_trip_plan": state["complete_trip_plan"]}
+    return {"trip_id": state['trip_id']}
 
 
 # Define the graph

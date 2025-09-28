@@ -1,18 +1,22 @@
-# SafarSmart - Travel Itinerary Planner
+# SafarSmart - AI-Powered Travel Itinerary Planner
 
-SafarSmart is a comprehensive web application designed to simplify and enhance your travel planning experience. It allows users to create, manage, and detail their travel itineraries with ease, incorporating AI-powered planning capabilities.
+SafarSmart is a comprehensive web application designed to revolutionize your travel planning experience with advanced AI capabilities. It allows users to create, manage, and personalize their travel itineraries with ease, offering intelligent suggestions and real-time alerts.
 
 ## Features
 
 -   **User Authentication:** Secure registration, login, and password management.
 -   **Trip Management:** Create, view, update, and delete your travel plans.
--   **Detailed Itinerary Planning:** Organize accommodation, track expenses, and get activity suggestions.
--   **AI-Powered Planning:** Leverages Langchain/LangGraph for intelligent trip suggestions and itinerary generation.
+-   **AI-Powered Itinerary Generation:** Leverages Langchain/LangGraph to craft detailed day-by-day itineraries, including dining, activities, and accommodation suggestions.
+-   **AI Chatbot with RAG:** An interactive chatbot that uses Retrieval Augmented Generation (RAG) to answer trip-related questions and modify plans.
+-   **Weather and News Alerts:** Receive email notifications for severe weather warnings or significant news events affecting your trip destination.
+-   **Checkpoint Tracking & Feedback:** Mark itinerary checkpoints as visited and provide feedback for each, with feedback elements freezing after submission.
+-   **PDF Download:** Generate and download a PDF version of your complete trip itinerary.
+-   **Payment Integration:** Secure payment processing for premium features using Razorpay.
 -   **Responsive Design:** A user-friendly interface accessible across various devices.
 
 ## AI Agents and LangGraph Integration
 
-SafarSmart leverages the power of **Langchain** and **LangGraph** to provide intelligent, AI-driven trip planning capabilities. The core of this functionality resides in a network of specialized AI agents, each responsible for a distinct aspect of the trip planning process.
+SafarSmart leverages the power of **Langchain** and **LangGraph** to provide intelligent, AI-driven trip planning capabilities. The core of this functionality resides in a network of specialized AI agents, each responsible for a distinct aspect of the trip planning process. We utilize **Google Generative AI (Gemini-Pro)** for core language model tasks and **Ollama** for efficient local embeddings, enabling Retrieval Augmented Generation (RAG) for enhanced context.
 
 ### How it Works
 
@@ -35,7 +39,7 @@ In addition to the main workflow, several other agents are available to provide 
 -   **Weather Forecaster (`weather_forecaster_agent`):** Provides detailed weather forecasts and advises travelers based on the destination and month.
 -   **Packing List Generator (`packing_list_generator_agent`):** Creates a comprehensive packing list tailored to the holiday type, destination, and expected weather.
 -   **Food & Culture Recommender (`food_culture_recommender_agent`):** Recommends popular local dishes, dining options, and provides insights into cultural norms and etiquette.
--   **Chat Agent (`chat_agent`):** Handles general user questions and can modify the complete trip plan based on user requests, providing an interactive conversational experience.
+-   **Chat Agent (`chat_agent`):** Handles general user questions and can modify the complete trip plan based on user requests, providing an interactive conversational experience, powered by RAG for contextual understanding and dynamic plan adjustments.
 
 This modular agent-based architecture ensures that each aspect of trip planning is handled by a specialized AI, leading to highly detailed, accurate, and personalized travel itineraries.
 
@@ -58,9 +62,10 @@ SafarSmart includes a payment system that allows users to add money to their wal
 ## Technologies Used
 
 -   **Backend:** Python, Django
--   **Database:** SQLite (default, can be configured for PostgreSQL, MySQL, etc.)
+-   **Database:** SQLite (default, can be configured for PostgreSQL, MySQL, etc.), ChromaDB (for vector embeddings)
 -   **Frontend:** HTML, CSS, JavaScript
--   **AI Integration:** Langchain, LangGraph
+-   **AI Integration:** Langchain, LangGraph, Google Generative AI (Gemini-Pro), Ollama (for local embeddings)
+-   **External APIs:** NewsData.io (for news alerts), OpenWeatherMap (for weather forecasts)
 -   **Payment Gateway:** Razorpay
 
 ## Installation
@@ -92,7 +97,39 @@ Follow these steps to set up and run SafarSmart on your local machine:
     pip install -r requirements.txt
     ```
 
-4.  **Database Setup:**
+4.  **Environment Variables Setup:**
+
+    Create a `.env` file in the root directory of the project and add the following variables. Replace the placeholder values with your actual API keys and credentials:
+
+    ```
+    GOOGLE_API_KEY="your_google_gemini_api_key"
+    SERPER_API_KEY="your_google_serper_api_key"
+    NEWSDATA_API_KEY="your_newsdata_io_api_key"
+    OPENWEATHERMAP_API_KEY="your_openweathermap_api_key"
+
+    # Email Configuration (for sending alerts and OTPs)
+    EMAIL_HOST="smtp.gmail.com"
+    EMAIL_PORT=587
+    EMAIL_USE_TLS=True
+    EMAIL_HOST_USER="your_email@example.com"
+    EMAIL_HOST_PASSWORD="your_email_app_password"
+
+    # Razorpay Settings
+    RAZORPAY_KEY_ID="your_razorpay_key_id"
+    RAZORPAY_KEY_SECRET="your_razorpay_key_secret"
+    ```
+
+5.  **Ollama Setup (for local embeddings):**
+
+    If you plan to use Ollama for local embeddings (configured in `planner/rag_logic.py`):
+
+    a.  **Download and install Ollama:** Follow the instructions on the official Ollama website: [https://ollama.ai/](https://ollama.ai/)
+    b.  **Pull the `llama3` model:** Open your terminal and run:
+        ```bash
+        ollama pull llama3
+        ```
+
+6.  **Database Setup:**
 
     Apply database migrations to create the necessary tables:
 
@@ -118,6 +155,16 @@ Follow these steps to set up and run SafarSmart on your local machine:
     ```
 
     The application will be accessible at `http://127.0.0.1:8000/`.
+
+## Workflow Diagrams
+
+### Chatbot Workflow
+
+![Chatbot Workflow](chat_workflow_v4.png)
+
+### LangGraph Workflow
+
+![LangGraph Workflow](workflow.png)
 
 ## Usage
 

@@ -23,6 +23,8 @@ class Trip(models.Model):
     is_finalized = models.BooleanField(default=False)
     trip_status = models.CharField(max_length=20, default='draft')
     is_started = models.BooleanField(default=False)
+    has_been_reviewed = models.BooleanField(default=False)
+    last_alert_sent = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
         return f"Trip to {self.destination} for {self.user.username}"
@@ -48,6 +50,9 @@ class Checkpoint(models.Model):
     tips = models.TextField(blank=True, null=True, help_text="Tips and advice for this activity")
     day_number = models.PositiveIntegerField(default=1, help_text="Day of the trip (1, 2, 3, etc.)")
     order_in_day = models.PositiveIntegerField(default=1, help_text="Order of activity within the day")
+    image_url = models.URLField(blank=True, null=True)
+    video_url = models.URLField(blank=True, null=True)
+    feedback_submitted = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['day_number', 'order_in_day', 'time']
